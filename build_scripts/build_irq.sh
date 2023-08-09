@@ -1,0 +1,1 @@
+make clean; make BOARD=ASIC RUN_ENV=DDR TEST_CASE=irq ARCH=RISCV

@@ -1,0 +1,1 @@
+make clean; make TEST_CASE=efuse INIT_DDR=NO RUN_ENV=DDR BOARD=ASIC DEBUG=1
