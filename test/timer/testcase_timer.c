@@ -7,13 +7,13 @@
 #include "cli.h"
 
 #define TEST_WITH_TNTERRUPT  	1
-#define TIMER_INTR	 			24
-#define SOFT_RESET_REG0 		0x50010c00
-#define SOFT_RESET_REG1 		0x50010c04		//bit[6] all timer reset
-#define CLK_EN_REG1 			0x50010804
+#define TIMER_INTR	 			100
+#define SOFT_RESET_REG0 		0x30013000		//bit[9] all timer reset
+#define SOFT_RESET_REG1 		0x30013004
+#define CLK_EN_REG1 			0x7030012004
 
 
-#define REG_TIMER_BASE				0x50022000
+#define REG_TIMER_BASE				0x07030003000
 
 #define REG_TIMER1_BASE				(REG_TIMER_BASE+0x00)
 #define REG_TIMER2_BASE				(REG_TIMER_BASE+0x14)
@@ -56,6 +56,11 @@
 #define REG_TIMER7_CURRENT_VALUE		(REG_TIMER7_BASE+0x04)
 #define REG_TIMER8_CURRENT_VALUE		(REG_TIMER8_BASE+0x04)
 
+
+// bit[0]: Timer Enable
+// bit[1]: Timer Mode
+// bit[2]: Timer Interrupt Mask
+// bit[3]: PWM
 #define REG_TIMER1_CONTROL		(REG_TIMER1_BASE+0x08)
 #define REG_TIMER2_CONTROL		(REG_TIMER2_BASE+0x08)
 #define REG_TIMER3_CONTROL		(REG_TIMER3_BASE+0x08)
@@ -84,10 +89,12 @@
 #define REG_TIMER7_INTSTATUS		(REG_TIMER7_BASE+0x10)
 #define REG_TIMER8_INTSTATUS		(REG_TIMER8_BASE+0x10)
 
+#define TIMER_CLK	(50 * 1000 * 1000)
+
 
 #define ARRAY_SIZE(x)	(sizeof(x) / sizeof((x)[0]))
 
-#define PINMUXGPIO0						0x50010488
+#define PINMUXGPIO0						0x70300110f8
 #define GPIO0DATA						0x50027000
 #define GPIO0DIRECTION					0x50027004
 
@@ -144,6 +151,7 @@ int timer_irq_handler(int irqn, void *priv)
     u32 int_status;
 	int_status = readl(REG_TIMERS_RAW_INTSTATUS);
 
+	uartlog("---In IRQ---\n");
 	/*clear int*/
 	mmio_read_32(REG_TIMERS_EOI);
 	us2 = timer_meter_get_us();
@@ -163,9 +171,9 @@ static int test_timer(int argc, char **argv)
 		return 0;
 	}
 
-	writel(SOFT_RESET_REG1, readl(SOFT_RESET_REG1)&~(1<<3));
+	writel(SOFT_RESET_REG0, readl(SOFT_RESET_REG0)&~(1<<9));
 	sleep(1000);
-	writel(SOFT_RESET_REG1, readl(SOFT_RESET_REG1)|(1<<3));
+	writel(SOFT_RESET_REG0, readl(SOFT_RESET_REG0)|(1<<9));
 
 #if TEST_WITH_TNTERRUPT
 	request_irq(TIMER_INTR, timer_irq_handler, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_MASK, "timer int", (void *)&num);
@@ -176,9 +184,9 @@ static int test_timer(int argc, char **argv)
 	writel(GPIO0DIRECTION, 0xffffffff);
 
 	uartlog("FPGA check GPIO0 in J7 C4 11\n");
-	count =5 * TIMER_CLK/1;  //fpga 50Mclk  5* 1Ãë
+	count =1 * TIMER_CLK/1;  //fpga 50Mclk  5* 1ï¿½ï¿½
 #ifdef	PLATFORM_PALLADIUM
-	count = 1000 * 50;       //pld 50M clk£¬ 1000Î¢Ãî
+	count = 1000 * 50;       //pld 50M clkï¿½ï¿½ 1000Î¢ï¿½ï¿½
 #endif
 
 	uartlog("count %d\n", count);
@@ -205,4 +213,9 @@ int  testcase_timer (void) {
 	return 0;
 }
 
-module_testcase("0", testcase_timer);
+#ifndef BUILD_TEST_CASE_ALL
+int testcase_main()
+{
+  return testcase_timer();
+}
+#endif

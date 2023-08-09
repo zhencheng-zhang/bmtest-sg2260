@@ -24,7 +24,7 @@ ROOT := $(shell pwd)
 OUTPUT_NAME := $(CHIP)
 OUTPUT_PATH := out
 RELEASE_PATH := release_out
-TOOL_PATH := $(shell pwd)/../../host-tools/
+TOOL_PATH := $(shell pwd)/../../gcc-riscv/
 
 include config.mk
 

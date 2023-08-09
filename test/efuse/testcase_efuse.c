@@ -44,9 +44,10 @@ static void print_efuse()
 	}
 
 #if 1
-	writel(SOFT_RESET_REG1,readl(SOFT_RESET_REG1)&~(1<<2));
+	// bit 6 in soft_reset_reg
+	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG1)&~(1<<SOFT_RESET_EFUSE0_BIT));
 	mdelay(1);
-	writel(SOFT_RESET_REG1,readl(SOFT_RESET_REG1)|(1<<2));
+	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG1)|(1<<SOFT_RESET_EFUSE0_BIT));
 #endif
 
 	efuse_embedded_write(0x5,0x12567f);
@@ -89,9 +90,11 @@ int testcase_efuse(void)
 {
 	//efuse_embedded_write(4, (u32)0x80000000);
 	//efuse_embedded_write(11, (u32)0x20505958);
-	writel(SOFT_RESET_REG1,readl(SOFT_RESET_REG1)&~(1<<2));
+	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)&~(1<<SOFT_RESET_EFUSE0_BIT));
 	mdelay(1);
-	writel(SOFT_RESET_REG1,readl(SOFT_RESET_REG1)|(1<<2));
+	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)|(1<<SOFT_RESET_EFUSE0_BIT));
+
+	uartlog("--after soft_reset_reg0---\n");
 
 	//efuse_info_t e;
 	//efuse_info_init(&e);
@@ -99,13 +102,18 @@ int testcase_efuse(void)
 	//e.bad_npus[1] = 24;
 	//memset(e.serdes_pcs, 0x00, sizeof(e.serdes_pcs));
 	//strcpy(e.signature, "'s Chip");
+	// addr
 	efuse_embedded_write(0x4,0x12345677);
 	efuse_embedded_write(0x5,0x1234567f);
 
-	writel(CLK_EN_REG0,readl(CLK_EN_REG0)&~(1<<29));
+	uartlog("--after efuse_embedded_write--\n");
+
+	writel(CLK_EN_REG0,readl(CLK_EN_REG0)&~(1<<CLK_EN_EFUSE_BIT));
 	mdelay(1);
 	uartlog("cyx clk gating\n");
-	writel(CLK_EN_REG0,readl(CLK_EN_REG0)|(1<<29));
+	writel(CLK_EN_REG0,readl(CLK_EN_REG0)|(1<<CLK_EN_EFUSE_BIT));
+
+	uartlog("---In efuse case----\n");
 
 	//efuse_info_write(&e);
 	print_efuse();
@@ -114,4 +122,9 @@ int testcase_efuse(void)
 	return 0;
 }
 
-module_testcase("1", testcase_efuse);
+#ifndef BUILD_TEST_CASE_ALL
+int testcase_main()
+{
+  return testcase_efuse();
+}
+#endif
