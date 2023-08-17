@@ -2,7 +2,7 @@
 #define REG_SPI_H
 
 
-
+// verified
 /* Full Register definitions */
 #define REG_BM1680_SPI_CTRL                     0x000
 #define REG_BM1680_SPI_CE_CTRL                  0x004
@@ -22,9 +22,9 @@
 #define BM1680_SPI_CTRL_CPHA                    (0x01 << 12)
 #define BM1680_SPI_CTRL_CPOL                    (0x01 << 13)
 #define BM1680_SPI_CTRL_HOLD_OL                 (0x01 << 14)
-#define BM1680_SPI_CTRL_WP_OL                   (0x03 << 15)
-#define BM1680_SPI_CTRL_LSBF                    (0x03 << 20)
-#define BM1680_SPI_CTRL_SRST                    (0x03 << 21)
+#define BM1680_SPI_CTRL_WP_OL                   (0x01 << 15)
+#define BM1680_SPI_CTRL_LSBF                    (0x01 << 20)
+#define BM1680_SPI_CTRL_SRST                    (0x01 << 21)
 #define BM1680_SPI_CTRL_SCK_DIV_SHIFT           0
 #define BM1680_SPI_CTRL_FRAME_LEN_SHIFT         16
 

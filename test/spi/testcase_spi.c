@@ -5,15 +5,54 @@
 #include "reg_spi.h"
 #include "smem_utils.h"
 #include "spi_flash.h"
+#include "bm_spi_nand.h"
+#include "command.h"
+#include "cli.h"
 
+// sg2042
+#define SOFT_RESET_REG0 	0x7030013000
+#define SOFT_RESET_REG1 	0x7030013004     //bit[1]: spi0   bit[2]: spi1
 
-#define SOFT_RESET_REG0 	0x50010c00
-#define SOFT_RESET_REG1 	0x50010c04     //bit[5] is spi reset
-#define CLK_EN_REG0 		0x50010800
-#define CLK_EN_REG1 		0x50010804
+#define CLK_EN_REG0 		0x7030012000
+#define CLK_EN_REG1 		0x7030012004
 
+#define SOFT_RESET_SPI0_BIT 23
+#define SOFT_RESET_SPI1_BIT 24
 
-int spi_flash_spic_fifo_rw_test(u64 spi_base)
+#define SOFT_RESET_SPI_BIT SOFT_RESET_SPI0_BIT
+
+#define CLK_EN_SPI_BIT      9
+
+#define ARRAY_SIZE(x)	(sizeof(x) / sizeof((x)[0]))
+
+u32 spi_flash_model_support_list[] = { \
+        SPI_ID_M25P128,  \
+        SPI_ID_N25Q128,  \
+        SPI_ID_W25Q128FV,\
+};
+
+static u64 spi_base = SPI_BASE;
+
+int spi_flash_id_check(int argc, char **argv)
+{
+  uartlog("\n--%s\n", __func__);
+
+  u32 flash_id = 0;
+
+  flash_id = spi_flash_read_id(spi_base);
+  u32 i = 0;
+  for (i=0; i < sizeof(spi_flash_model_support_list)/sizeof(u32); i++) {
+    if (flash_id == spi_flash_model_support_list[i]) {
+      uartlog("read id test success, read val:0x%08x\n", flash_id);
+      return 0;
+    }
+  }
+
+  uartlog("read id check failed, read val:0x%08x\n", flash_id);
+  return 0;
+}
+
+int spi_flash_spic_fifo_rw_test(int argc, char **argv)
 {
   u32 data_dw = 0x76543210;
   u16 data_w = 0xabcd;
@@ -52,7 +91,7 @@ int spi_flash_spic_fifo_rw_test(u64 spi_base)
   return 0;
 }
 
-int spi_flash_rw_test(u64 spi_base)
+int spi_flash_rw_test(int argc, char **argv)
 {
   u32 sector_num = 1;
   u32 sector_addr = 0x0;
@@ -70,14 +109,10 @@ int spi_flash_rw_test(u64 spi_base)
     spi_flash_write_by_page(spi_base, sector_addr + off, wdata, SPI_PAGE_SIZE);
 
 #if 1
-	writel(CLK_EN_REG1,readl(CLK_EN_REG1)&~(0x4));
-	//mdelay(1);
-	uartlog(" clk gating\n");
-	writel(CLK_EN_REG1,readl(CLK_EN_REG1)|0x4);
-
 	//writel(SOFT_RESET_REG1,readl(SOFT_RESET_REG1)&~(1<<5));
 	//mdelay(1);
 	//writel(SOFT_RESET_REG1,readl(SOFT_RESET_REG1)|(1<<5));
+  // CE_CTRL  TRAN_NUM
 	uartlog(" val=0x%x 0x%x 0x%x\n",readl(spi_base),readl(spi_base+0x4),readl(spi_base+0x14));
 #endif
 
@@ -135,31 +170,31 @@ int spi_flash_full_chip_scan(u64 spi_base)
   return 0;
 }
 
-int spi_flash_basic_test(void)
-{
-  u64 spi_base = spi_flash_map_enable(0);
+// int spi_flash_basic_test(void)
+// {
+//   u64 spi_base = spi_flash_map_enable(0);
 
-  uartlog(" before spi flash init\n");
-  spi_flash_init(spi_base);
+//   uartlog(" before spi flash init\n");
+//   spi_flash_init(spi_base);
 
-  int ret = 0;
-  ret |= spi_flash_id_check(spi_base);
+//   int ret = 0;
+//   ret |= spi_flash_id_check(spi_base);
 
-  spi_flash_spic_fifo_rw_test(spi_base);
+//   spi_flash_spic_fifo_rw_test(spi_base);
 
-  ret |= spi_flash_rw_test(spi_base);
- // ret |= spi_flash_full_chip_scan(spi_base);
+//   ret |= spi_flash_rw_test(spi_base);
+//  // ret |= spi_flash_full_chip_scan(spi_base);
 
-  writel(SOFT_RESET_REG1,readl(SOFT_RESET_REG1)&~(1<<5));
-  mdelay(1);
-  writel(SOFT_RESET_REG1,readl(SOFT_RESET_REG1)|(1<<5));
+//   writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)&~(1<<SOFT_RESET_SPI_BIT));
+//   mdelay(1);
+//   writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)|(1<<SOFT_RESET_SPI_BIT));
 
-  spi_flash_set_dmmr_mode(spi_base, 1);
+//   spi_flash_set_dmmr_mode(spi_base, 1);
 
-  uartlog("%s done!\n", __func__);
+//   uartlog("%s done!\n", __func__);
 
-  return ret;
-}
+//   return ret;
+// }
 
 int spi_flash_program_test(void)
 {
@@ -170,26 +205,46 @@ int spi_flash_program_test(void)
   return err;
 }
 
+static struct cmd_entry test_cmd_list[] __attribute__ ((unused)) = {
+	{"id_check", spi_flash_id_check, 0, NULL},
+  {"fifo_test", spi_flash_spic_fifo_rw_test, 1, NULL},
+  {"flash_test", spi_flash_rw_test, 1, NULL},
+	{NULL, NULL, 0, NULL}
+};
+
 int testcase_spi(void)
 {
-  int err = 0;
+  // int err = 0;
 
-	writel(CLK_EN_REG1,readl(CLK_EN_REG1)&~(0x4));
+	writel(CLK_EN_REG0,readl(CLK_EN_REG0)&~(1 << CLK_EN_SPI_BIT));
 	mdelay(1);
-	writel(CLK_EN_REG1,readl(CLK_EN_REG1)|0x4);
+	writel(CLK_EN_REG0,readl(CLK_EN_REG0)|(1 << CLK_EN_SPI_BIT));
 
-	writel(SOFT_RESET_REG1,readl(SOFT_RESET_REG1)&~(1<<5));
+	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)&~(1<<SOFT_RESET_SPI_BIT));
 	mdelay(1);
-	writel(SOFT_RESET_REG1,readl(SOFT_RESET_REG1)|(1<<5));
+	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)|(1<<SOFT_RESET_SPI_BIT));
 
+  uartlog(" before spi flash init\n");
+  spi_flash_init(spi_base);
 
+  int i = 0;
+	for(i = 0;i < ARRAY_SIZE(test_cmd_list) - 1;i++) {
+		command_add(&test_cmd_list[i]);
+	}
+  
+	cli_simple_loop();
 
   //err |= spi_flash_program_test();
  // uartlog("spi_flash_program_test   %s\n",err ? "failed!":"passed!");
-  err |= spi_flash_basic_test();
-  uartlog("spi_flash_basic_test   %s\n", err ? "failed!":"passed!");
+  // err |= spi_flash_basic_test();
+  // uartlog("spi_flash_basic_test   %s\n", err ? "failed!":"passed!");
 
-  return err;
+  return 0;
 }
 
-module_testcase("1", testcase_spi);
+#ifndef BUILD_TEST_CASE_ALL
+int testcase_main()
+{
+  return testcase_spi();
+}
+#endif

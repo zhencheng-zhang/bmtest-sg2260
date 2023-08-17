@@ -3,6 +3,7 @@
 
 //#define SPI_FLASH_PDL_START_ADDR  0xF0000
 #define SPI_FLASH_PDL_START_ADDR  0
+#define GLOBAL_MEM_START_ADDR_ARM
 
 int spi_flash_program_pdl(void)
 {
@@ -63,6 +64,7 @@ void copy_globalmem_to_flash(u32 fa, u64 ga, u32 count)
 
     u8 data[SPI_PAGE_SIZE];
     memset(data, 0x00, SPI_PAGE_SIZE);
+    line();
     for (int i = 0; i < xfer_size; i++) {
       data[i] = readb(GLOBAL_MEM_START_ADDR_ARM + ga + offset + i);
     }
@@ -94,6 +96,7 @@ void copy_flash_to_globalmem(u64 ga, u32 fa, u32 count)
     memset(data, 0x00, SPI_PAGE_SIZE);
     spi_flash_read_by_page(spi_base, fa + offset, data, xfer_size);
 
+    line();
     for (int i = 0; i < xfer_size; i++) {
       writeb(GLOBAL_MEM_START_ADDR_ARM + ga + offset + i, data[i]);
     }

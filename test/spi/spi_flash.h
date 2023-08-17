@@ -3,9 +3,18 @@
 
 #include "system_common.h"
 
+#define line()  do {uartlog("\n %s %d \n", __FILE__, __LINE__);} while(0)
+
+#define SPI0_BASE   0x07000180000
+#define SPI1_BASE   0x07002180000
+
+#define SPI_BASE    SPI0_BASE
+
 #define DO_SPI_FW_PROG
 #define DO_SPI_FW_PROG_BUF_ADDR     0x10100000 //0x45000000
 #define DO_SPI_FW_PROG_BUF_SIZE     0x400 		//0x10000
+
+#define PLATFORM_ASIC
 
 #ifdef PLATFORM_ASIC
 #define SPI_PAGE_SIZE           256
@@ -38,7 +47,7 @@
 #define SPI_CMD_WRDI            0x04
 #define SPI_CMD_RDID            0x9F
 
-#define SPI_CMD_RDSR            0x05
+#define SPI_CMD_RDSR            0x05    //read status reg
 #define SPI_CMD_RDSR2           0x35
 #define SPI_CMD_RDSR3           0x15
 
@@ -49,7 +58,7 @@
 #define SPI_CMD_READ            0x03
 #define SPI_CMD_FAST_READ       0x0B
 #define SPI_CMD_PP              0x02
-#define SPI_CMD_SE              0xD8
+#define SPI_CMD_SE              0xD8    //64kb block erase
 #define SPI_CMD_BE              0xC7
 
 
@@ -60,15 +69,20 @@
 #define SPI_STATUS_BP2          (0x01 << 4)
 #define SPI_STATUS_SRWD         (0x01 << 7)
 
+#define SPI0_INTR 108
+#define SPI1_INTR 109
+#define SPI_INTR  SPI0_INTR
+
 u8 spi_reg_status(u64 spi_base, u8 cmd);
 u64 spi_flash_map_enable(u8 enable);
 
 void spi_flash_init(u64 spi_base);
 void spi_flash_set_dmmr_mode(u64 spi_base, u32 en);
-int spi_flash_id_check(u64 spi_base);
+// int spi_flash_id_check(u64 spi_base);
 int do_sector_erase(u64 spi_base, u32 addr, u32 sector_num);
 int do_full_chip_erase(u64 spi_base);
 //int spi_flash_program(u64 spi_base, u32 sector_addr);
+u32 spi_flash_read_id(u64 spi_base);
 
 int spi_flash_write_by_page(u64 spi_base, u32 fa, u8 *data, u32 size);
 void spi_flash_read_by_page(u64 spi_base, u32 fa, u8 *data, u32 size);
