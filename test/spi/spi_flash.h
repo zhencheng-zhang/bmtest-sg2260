@@ -41,6 +41,7 @@
 #define SPI_ID_M25P128          0x00182020
 #define SPI_ID_N25Q128          0x0018ba20
 #define SPI_ID_W25Q128FV        0x001840ef
+#define SPI_ID_GD25LB512ME      0x001a67c8
 
 /* cmd for M25P128 on FPGA */
 #define SPI_CMD_WREN            0x06

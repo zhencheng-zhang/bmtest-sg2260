@@ -29,6 +29,7 @@ u32 spi_flash_model_support_list[] = { \
         SPI_ID_M25P128,  \
         SPI_ID_N25Q128,  \
         SPI_ID_W25Q128FV,\
+        SPI_ID_GD25LB512ME, \
 };
 
 static u64 spi_base = SPI_BASE;
