@@ -92,6 +92,46 @@ int spi_flash_spic_fifo_rw_test(int argc, char **argv)
   return 0;
 }
 
+int spi_flash_read_test(int argc, char **argv)
+{
+  u32 sector_addr = 0x0;
+  u8 rdata[SPI_PAGE_SIZE];
+  memset(rdata, 0x0, SPI_PAGE_SIZE);
+
+  spi_flash_read_by_page(spi_base, sector_addr, rdata, SPI_PAGE_SIZE);
+  
+  dump_hex((char *)"rdata", (void *)rdata, SPI_PAGE_SIZE);
+
+  return 0;
+}
+
+int spi_flash_erase_test(int argc, char **argv)
+{
+  u32 sector_num = 1;
+  u32 sector_addr = 0x0;
+  do_sector_erase(spi_base, sector_addr, sector_num);
+
+  // TODO: check erase: erase area is 0xff
+
+  return 0;
+}
+
+int spi_flash_write_test(int argc, char **argv)
+{
+  u32 sector_num = 1;
+  u32 sector_addr = 0x0;
+  do_sector_erase(spi_base, sector_addr, sector_num);
+
+  u8 wdata[SPI_PAGE_SIZE];
+  for (int i = 0; i < SPI_PAGE_SIZE; i++) {
+    wdata[i] = 0x5a;//rand();
+  }
+
+  spi_flash_write_by_page(spi_base, sector_addr, wdata, SPI_PAGE_SIZE);
+
+  return 0;
+}
+
 int spi_flash_rw_test(int argc, char **argv)
 {
   u32 sector_num = 1;
@@ -171,32 +211,6 @@ int spi_flash_full_chip_scan(u64 spi_base)
   return 0;
 }
 
-// int spi_flash_basic_test(void)
-// {
-//   u64 spi_base = spi_flash_map_enable(0);
-
-//   uartlog(" before spi flash init\n");
-//   spi_flash_init(spi_base);
-
-//   int ret = 0;
-//   ret |= spi_flash_id_check(spi_base);
-
-//   spi_flash_spic_fifo_rw_test(spi_base);
-
-//   ret |= spi_flash_rw_test(spi_base);
-//  // ret |= spi_flash_full_chip_scan(spi_base);
-
-//   writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)&~(1<<SOFT_RESET_SPI_BIT));
-//   mdelay(1);
-//   writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)|(1<<SOFT_RESET_SPI_BIT));
-
-//   spi_flash_set_dmmr_mode(spi_base, 1);
-
-//   uartlog("%s done!\n", __func__);
-
-//   return ret;
-// }
-
 int spi_flash_program_test(void)
 {
   uartlog("%s\n", __func__);
@@ -210,6 +224,9 @@ static struct cmd_entry test_cmd_list[] __attribute__ ((unused)) = {
 	{"id_check", spi_flash_id_check, 0, NULL},
   {"fifo_test", spi_flash_spic_fifo_rw_test, 1, NULL},
   {"flash_test", spi_flash_rw_test, 1, NULL},
+  {"read_test", spi_flash_read_test, 1, NULL},
+  {"erase_test", spi_flash_erase_test, 1, NULL},
+  {"write_test", spi_flash_write_test, 1, NULL},
 	{NULL, NULL, 0, NULL}
 };
 
@@ -234,11 +251,6 @@ int testcase_spi(void)
 	}
   
 	cli_simple_loop();
-
-  //err |= spi_flash_program_test();
- // uartlog("spi_flash_program_test   %s\n",err ? "failed!":"passed!");
-  // err |= spi_flash_basic_test();
-  // uartlog("spi_flash_basic_test   %s\n", err ? "failed!":"passed!");
 
   return 0;
 }

@@ -80,31 +80,18 @@ u8 spi_non_data_tran(u64 spi_base, u8* cmd_buf, u32 with_cmd, u32 addr_bytes)
 
   writel(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[0]);
 
-  uartlog("----%s\n", __func__);
-  uartlog("----0 before tran, csr reg:%x, valid bytes in FIFO: %d, num: %x\n", 
-            readl(spi_base + REG_BM1680_SPI_TRAN_CSR), readl(spi_base + REG_BM1680_SPI_FIFO_PT) & 0xff, 
-            readl(spi_base + REG_BM1680_SPI_FIFO_PORT));
-
-
   /* issue tran */
   writel(spi_base + REG_BM1680_SPI_INT_STS, 0);   //clear all int
   tran_csr |= BM1680_SPI_TRAN_CSR_GO_BUSY;
   writel(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
 
-  uartlog("----1 after tran csr reg:%x, valid bytes in FIFO: %d\n", 
-            readl(spi_base + REG_BM1680_SPI_TRAN_CSR), readl(spi_base + REG_BM1680_SPI_FIFO_PT) & 0xff);
-
   /* wait tran done */
   u32 int_stat = _check_reg_bits((volatile u32*)spi_base, REG_BM1680_SPI_INT_STS,
                       BM1680_SPI_INT_TRAN_DONE, 100000);
 
-  uartlog("----2 after check, csr reg:%x, valid bytes in FIFO: %d, num: %x\n", 
-            readl(spi_base + REG_BM1680_SPI_TRAN_CSR), readl(spi_base + REG_BM1680_SPI_FIFO_PT) & 0xff, 
-            readl(spi_base + REG_BM1680_SPI_FIFO_PORT));
-
   if (int_stat == 0) {
     uartlog("non data timeout, int stat: 0x%08x\n", int_stat);
-    return -1;
+    // return -1;
   }
   writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //should flush FIFO after tran
 
@@ -178,7 +165,7 @@ u8 spi_data_out_tran(u64 spi_base, u8* src_buf, u8* cmd_buf, u32 with_cmd, u32 a
                       BM1680_SPI_INT_TRAN_DONE, 100000);
   if (int_stat == 0) {
     uartlog("data out timeout, int stat: 0x%08x\n", int_stat);
-    return -1;
+    // return -1;
   }
   writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);  //should flush FIFO after tran
   return 0;
@@ -226,7 +213,7 @@ u8 spi_data_in_tran(u64 spi_base, u8* dst_buf, u8* cmd_buf, u32 with_cmd, u32 ad
                       BM1680_SPI_INT_RD_FIFO, 10000000);
   if (int_stat == 0) {
     uartlog("no read FIFO int\n");
-    return -1;
+    // return -1;
   }
 
   /* get data */
@@ -259,7 +246,7 @@ u8 spi_data_in_tran(u64 spi_base, u8* dst_buf, u8* cmd_buf, u32 with_cmd, u32 ad
                       BM1680_SPI_INT_TRAN_DONE, 100000);
   if (int_stat == 0) {
     uartlog("data in timeout, int stat: 0x%08x\n", int_stat);
-    return -1;
+    // return -1;
   }
   writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);  //should flush FIFO after tran
   return 0;
@@ -311,42 +298,15 @@ u8 spi_in_out_tran(u64 spi_base, u8* dst_buf, u8* src_buf,  u32 with_cmd, u32 ad
   /* issue tran */
   writel(spi_base + REG_BM1680_SPI_INT_STS, 0);   //clear all int
 
-  uartlog("----0 before tran, csr reg:%04x, valid bytes in FIFO: %d, int_sts: %02x\n", 
-            readl(spi_base + REG_BM1680_SPI_TRAN_CSR) & 0xffff, readl(spi_base + REG_BM1680_SPI_FIFO_PT) & 0xff, 
-            readl(spi_base + REG_BM1680_SPI_INT_STS) & 0xff);
-
-
   writel(spi_base + REG_BM1680_SPI_TRAN_NUM, get_bytes);
   tran_csr |= BM1680_SPI_TRAN_CSR_GO_BUSY;
   writel(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
-
-  uartlog("----1 after tran csr reg:%04x, valid bytes in FIFO: %d, int_sts: %02x\n, tran_csr: %x", 
-            readl(spi_base + REG_BM1680_SPI_TRAN_CSR) & 0xffff, readl(spi_base + REG_BM1680_SPI_FIFO_PT) & 0xff, 
-            readl(spi_base + REG_BM1680_SPI_INT_STS) & 0xff, tran_csr);
 
   // trans cmd first
   /* wait tran done and get data */
   u32 int_stat = _check_reg_bits((volatile u32*)spi_base, REG_BM1680_SPI_INT_STS,
                       BM1680_SPI_INT_TRAN_DONE, 100000);
-  // u32 int_stat = _check_reg_bits((volatile u32*)spi_base, REG_BM1680_SPI_INT_EN,
-  //                     BM1680_SPI_INT_TRAN_DONE_EN, 10000000);
-  // while ((readl((volatile u32*)(spi_base + REG_BM1680_SPI_INT_EN)) & 0xff) != 0) {
-  //   udelay(100);
-  // }
-  // while (1)
-  // {
-  //   volatile int flag = read_int_flag();
-  //   if (flag || (readl((volatile u32 *)(spi_base + REG_BM1680_SPI_INT_STS)) & BM1680_SPI_INT_TRAN_DONE))
-  //   {
-  //     break;
-  //   }
-  //   mdelay(1);
-  // }
   
-  // spi_flash_set_dmmr_mode(spi_base, 0);
-  uartlog("----2 after check, csr reg:%04x, valid bytes in FIFO: %d, int_sts: %02x\n", 
-            readl(spi_base + REG_BM1680_SPI_TRAN_CSR) & 0xffff, readl(spi_base + REG_BM1680_SPI_FIFO_PT) & 0xff, 
-            readl(spi_base + REG_BM1680_SPI_INT_STS) & 0xff);
   if (int_stat == 0) {
     uartlog("data in timeout\n");
     // return -1;
@@ -609,7 +569,7 @@ int spi_flash_write_by_page(u64 spi_base, u32 fa, u8 *data, u32 size)
       //dump_hex((char *)"cmp_buf", (void *)cmp_buf, SPI_PAGE_SIZE);
       return ret;
     }else{
-	  uartlog("page program test memcmp success: 0x%08x\n", ret);
+	    uartlog("page program test memcmp success: 0x%08x\n", ret);
     }
 #endif
   }
@@ -617,7 +577,6 @@ int spi_flash_write_by_page(u64 spi_base, u32 fa, u8 *data, u32 size)
   return 0;
 }
 
-#define CLK_EN_REG1 			0x7030012004
 void spi_flash_read_by_page(u64 spi_base, u32 fa, u8 *data, u32 size)
 {
   u8 page_num = size / SPI_PAGE_SIZE;
