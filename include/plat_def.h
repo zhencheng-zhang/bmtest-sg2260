@@ -1,0 +1,190 @@
+#ifndef __PLATFORM_DEF_H__
+#define __PLATFORM_DEF_H__
+
+#ifndef __ASSEMBLY__
+#include "bm_types.h"
+#endif
+
+#define LOCAL_MEM_START_ADDR			0x04000000
+#define SPI_CTLR_BASE_ADDR_REMAP		0x44000000
+
+#define TOP_CTLR_BASE_ADDR				0x50010000
+#define SERDES_PHY_CTLR_BASE_ADDR		0x50040000
+//#define I2C0_CTLR_BASE_ADDR				0x5001A000
+//#define I2C1_CTLR_BASE_ADDR				0x5001C000
+//#define I2C2_CTLR_BASE_ADDR				0x5001E000
+#define OS_TIMER_CTLR_BASE_ADDR			0x50022000
+#define INT_CTLR_BASE_ADDR				0x50023000
+#define UART_CTLR_BASE_ADDR				0x50118000
+#define UART1_CTLR_BASE_ADDR			0x5011A000
+#define UART2_CTLR_BASE_ADDR			0x5011C000
+#define WDT_CTLR_BASE_ADDR				0x50026000
+#define GPIO_CTLR_BASE_ADDR				0x50027000
+#define DDR_CTRL2						0x68000000
+#define DDR_CTRL0_A						0x6A000000
+#define DDR_CTRL0_B						0x6C000000
+#define DDR_CTRL1						0x6E000000
+#define NCORE_BASE						0x50200000
+
+// ck #define TOP_BASE TOP_CTLR_BASE_ADDR
+// ck #define PINMUX_BASE						(TOP_BASE + 0x400)
+
+/* Full Register definitions */
+
+#define REG_TOP_CONF					0x50010004
+#define REG_TOP_CONTROL					0x50010008
+#define REG_TOP_AP_LITE_BASE			0x5001003C
+#define REG_TOP_PLL_STAT				0x500100C0
+#define REG_TOP_MPLL_CTL				0x500100E8
+#define REG_TOP_TPLL_CTL				0x500100EC
+#define REG_TOP_FPLL_CTL				0x500100F0
+#define REG_TOP_VPLL_CTL				0x500100F8
+#define REG_TOP_CLK_EN0					0x50010800
+#define REG_TOP_CLK_EN1					0x50010804
+#define REG_TOP_CLK_EN2					0x50010808
+#define REG_TOP_CLK_50M_A53_DIV			0x50010848
+#define REG_TOP_CLK_EMMC_DIV			0x5001084C
+#define REG_TOP_CLK_100K_EMMC_DIV		0x50010850
+#define REG_TOP_CLK_SD_DIV				0x50010854
+#define REG_TOP_CLK_100K_SD_DIV			0x50010858
+#define REG_TOP_CLK_REF_ETH0_DIV		0x50010864
+#define REG_TOP_CLK_TIMER1_DIV			0x50010878
+#define REG_TOP_CLK_AXI6_DIV			0x500108BC
+#define REG_TOP_SOFT_RST0				0x7030013000
+#define REG_TOP_SOFT_RST1				0x7030013004
+
+#define REG_TOP_CLOCK_EN0			0x50010800
+#define REG_TOP_CLOCK_EN1			0x50010804
+
+// #define BIT_TOP_SOFT_RST0_EMMC			(1 << 20)
+// #define BIT_TOP_SOFT_RST0_SD          	(1 << 21)
+#define BIT_TOP_SOFT_RST0_EMMC			(1 << 27)
+#define BIT_TOP_SOFT_RST0_SD          	(1 << 28)
+#define BIT_MASK_TOP_SOFT_RST0_DDRC		(0xFF << 3)
+#define BIT_MASK_TOP_SOFT_RST0_I2C0		(1 << 26)
+
+/* GPIO PORT */
+#define REG_GPIO_EXT_PORTA				0x50
+
+/* Physical Memory Map */
+#define PHYS_SDRAM_0A					0x100000000
+#define PHYS_SDRAM_0B					0x200000000
+#define PHYS_SDRAM_1					0x300000000
+#define PHYS_SDRAM_2					0x400000000
+
+#define PHYS_SDRAM					0x100000000
+#define PHYS_SDRAM_SIZE					0x400000000
+
+#define SEC_SRAM_BASE					0x10000000
+
+#define ENABLE_PRINT
+
+/* force skip ddr init in fpga */
+#if defined(PLATFORM_FPGA) && !defined(NO_DDR_INIT)
+#define NO_DDR_INIT
+#endif
+
+
+#define CONFIG_TIMER_FREQ				(50000000)
+
+#ifdef PLATFORM_ASIC
+#define CONFIG_SYS_CLOCK				(50000000)
+#define CONFIG_MAIN_PLL_CLK				(225 * 1000 * 1000)       //(300 * 1000 * 1000)
+#define CONFIG_TIMER_CLK_FAST			(CONFIG_MAIN_PLL_CLK / 5)
+#define CONFIG_TIMER_CLK_SLOW			(100 * 1000)
+#elif defined(PLATFORM_FPGA) || defined(PLATFORM_FPGA_MUL)
+#define CONFIG_SYS_CLOCK				10000000
+#define CONFIG_TIMER_CLK_FAST			10000000
+#define CONFIG_TIMER_CLK_SLOW			10000000
+#elif defined(PLATFORM_PALLADIUM)
+#define CONFIG_SYS_CLOCK				50000000  // ??
+#define CONFIG_TIMER_CLK_FAST			10000000  // ??
+#define CONFIG_TIMER_CLK_SLOW			10000000  // ??
+#else
+// ck #error "Undefined PLATFORM"
+#endif
+
+/*******************************************************************************
+ * MPIDR macros
+ ******************************************************************************/
+#define MPIDR_MT_MASK		(U(1) << 24)
+#define MPIDR_CPU_MASK		MPIDR_AFFLVL_MASK
+#define MPIDR_CLUSTER_MASK	(MPIDR_AFFLVL_MASK << MPIDR_AFFINITY_BITS)
+#define MPIDR_AFFINITY_BITS	(8)
+#define MPIDR_AFFLVL_MASK	(0xff)
+
+#define PLATFORM_MAX_CPUS_PER_CLUSTER	4
+#define PLATFORM_CLUSTER_COUNT		2
+#define PLATFORM_CLUSTER0_CORE_COUNT	PLATFORM_MAX_CPUS_PER_CLUSTER
+#define PLATFORM_CLUSTER1_CORE_COUNT	PLATFORM_MAX_CPUS_PER_CLUSTER
+#define PLATFORM_CORE_COUNT		(PLATFORM_CLUSTER0_CORE_COUNT + \
+					 PLATFORM_CLUSTER1_CORE_COUNT)
+
+/* CCI550, Cluster0 is take by Coresight DAP */
+#define BM_CCI550_CLUSTER0_SL_IFACE_IX	1
+#define BM_CCI550_CLUSTER1_SL_IFACE_IX	2
+
+#define BM_PRIMARY_CPU	0
+
+#define BOOT_SECONDARY_MAILBOX    0x10000008
+#define BOOT_VECTOR     0x10000000
+
+//ddr
+#ifndef PLATFORM_FPGA
+//#define DDR_INTERLEAVE_MODE0
+#define DDR_INTERLEAVE_MODE1
+#endif
+
+#if defined(RUN_IN_SRAM)
+#define BOOT_ENTRY      0x10001000
+#else
+#define BOOT_ENTRY      0x410000000
+#endif
+
+#define TOP_CTRL_REG            0x0008
+#define DDR_INTLV_EN            BIT(3)
+#define DDR_INTLV_MODE          BIT(4)
+
+#ifndef __ASSEMBLY__
+extern uint32_t BOARD_TYPE;
+
+enum {
+	MCU_BM1684X_EVB = 0x20,
+	MCU_BM1684X_SM7M_RB = 0x30,
+	MCU_BM1684X_SM7_CTRL = 0x31,
+	MCU_BM1684X_SM7M_CUST_V1 = 0x32
+ };
+
+enum {
+	BM1684X_EVB_V0_0 = 130,
+	BM1684X_SM7M_V0_0_RB = 134,
+	BM1684X_SM7_CTRL = 135,
+	BM1684X_SM7M_CUST_FIREFLY_V1 = 200,
+	BM1684X_SM7M_CUST_FIREFLY_V2  = 201,
+};
+
+#endif
+
+#define BIT_SHIFT_GPIO_I2C_ADDR		5 // 4bits, GPIO[8:5]
+#define BIT_MASK_GPIO_I2C_ADDR		(0xF << BIT_SHIFT_GPIO_I2C_ADDR)
+
+#define MCU_I2C_BUS_BASE		I2C1_CTLR_BASE_ADDR
+#define MCU_DEV_ADDR			0x17
+
+/*
+ * watchdog definitions
+ */
+#define REG_WDT_CR	0x0
+#define REG_WDT_TORR	0x4
+#define REG_WDT_CRR	0xC
+
+#define BIT_MASK_TOP_CTRL_SW_ROOT_RESET_EN	(1 << 2) // 1 to enable warm reboot
+
+/* board type reg */
+#define BOARD_TYPE_REG	0x00
+/* hardware version reg */
+#define HW_VERSION_REG  0x02
+/* DDR type(4/4x) reg */
+#define DDR_TYPE_REG	0x15
+
+#endif //__PLATFORM_DEF_H__

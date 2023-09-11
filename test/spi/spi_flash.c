@@ -306,7 +306,7 @@ u8 spi_in_out_tran(u64 spi_base, u8* dst_buf, u8* src_buf,  u32 with_cmd, u32 ad
   /* wait tran done and get data */
   u32 int_stat = _check_reg_bits((volatile u32*)spi_base, REG_BM1680_SPI_INT_STS,
                       BM1680_SPI_INT_TRAN_DONE, 100000);
-  
+
   if (int_stat == 0) {
     uartlog("data in timeout\n");
     // return -1;

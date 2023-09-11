@@ -99,7 +99,7 @@ int spi_flash_read_test(int argc, char **argv)
   memset(rdata, 0x0, SPI_PAGE_SIZE);
 
   spi_flash_read_by_page(spi_base, sector_addr, rdata, SPI_PAGE_SIZE);
-  
+
   dump_hex((char *)"rdata", (void *)rdata, SPI_PAGE_SIZE);
 
   return 0;
@@ -223,10 +223,10 @@ int spi_flash_program_test(void)
 static struct cmd_entry test_cmd_list[] __attribute__ ((unused)) = {
 	{"id_check", spi_flash_id_check, 0, NULL},
   {"fifo_test", spi_flash_spic_fifo_rw_test, 1, NULL},
-  {"flash_test", spi_flash_rw_test, 1, NULL},
   {"read_test", spi_flash_read_test, 1, NULL},
   {"erase_test", spi_flash_erase_test, 1, NULL},
   {"write_test", spi_flash_write_test, 1, NULL},
+  {"flash_test", spi_flash_rw_test, 1, NULL},
 	{NULL, NULL, 0, NULL}
 };
 
@@ -249,7 +249,7 @@ int testcase_spi(void)
 	for(i = 0;i < ARRAY_SIZE(test_cmd_list) - 1;i++) {
 		command_add(&test_cmd_list[i]);
 	}
-  
+
 	cli_simple_loop();
 
   return 0;

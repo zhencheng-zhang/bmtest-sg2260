@@ -46,8 +46,8 @@ int watchdog_irq_handler(int irqn, void *priv)
     u32 int_status;
 	int_status = readl(REG_WDT + WDT_STAT);
 
-	/** Interrupt Clear Register:  
-	 * Clears the watchdog interrupt. 
+	/** Interrupt Clear Register:
+	 * Clears the watchdog interrupt.
 	 * This can be used to clear the interrupt without restarting the watchdog counter.
 	 */
 	/*clear int stop reboot; or dont clear let it reboot*/
@@ -85,7 +85,7 @@ int testcase_watchdog(void)
 	mmio_write_32(REG_WDT+WDT_TORR, 0x9 );
 #endif
 
-	uartlog("----TOP: %u   CR: %u    TORR:%u---\n", mmio_read_32(REG_TOP_CONTROL), 
+	uartlog("----TOP: %u   CR: %u    TORR:%u---\n", mmio_read_32(REG_TOP_CONTROL),
 													mmio_read_32(REG_WDT+WDT_CR),
 													mmio_read_32(REG_WDT+WDT_TORR));
 
@@ -130,7 +130,7 @@ int testcase_watchdog(void)
 
 	us3 = timer_meter_get_us();
 	writel(GPIO0DATA,0xffffffff);
- 	uartlog(" us1=%d us2=%d us3=%d\n", us1,us2,us3);
+	uartlog(" us1=%d us2=%d us3=%d\n", us1,us2,us3);
 #endif
 
   uartlog("need check whether cpu is reset!!!!\n");

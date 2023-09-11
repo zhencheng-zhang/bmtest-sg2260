@@ -1,7 +1,7 @@
 OPTFLAGS := \
 	-O0 \
 	-Wall \
-    -Werror
+	-Werror
 
 COMMONFLAGS := \
 	-march=rv64imafdc -mcmodel=medany -mabi=lp64d
@@ -35,8 +35,14 @@ DEFS += -g -DENABLE_DEBUG
 endif
 
 DEFS += -DUSE_BMTAP
+
+ifeq ($(CHIP), SG2042)
+DEFS += -DCONFIG_CHIP_SG2042
+CFLAGS += -DCONFIG_CHIP_SG2042
+else
 DEFS += -DCONFIG_CHIP_SG2260
-#DEFS += -DBUILD_TEST_CASE_$(TEST_CASE)
+CFLAGS += -DCONFIG_CHIP_SG2260
+endif
 
 ASFLAGS := \
 	$(OPTFLAGS) \
@@ -49,7 +55,7 @@ CFLAGS := \
 	-ffunction-sections \
 	-fdata-sections \
 	-nostdlib \
-	-std=gnu99 
+	-std=gnu99
 
 CXXFLAGS := \
 	$(COMMONFLAGS) \
@@ -89,19 +95,14 @@ C_SRC += \
 	$(ROOT)/common/pll.c                    \
 	$(ROOT)/common/timer.c                  \
 	$(ROOT)/common/md5.c                    \
-	$(ROOT)/common/dma.c \
-	$(ROOT)/common/common.c
+	$(ROOT)/common/dma.c                    \
+	$(ROOT)/common/common.c                 \
+	$(ROOT)/common/thread_safe_printf.c     \
+	$(ROOT)/common/riscv_lock.c             \
+	$(ROOT)/common/smp.c
 
 ifeq ($(ARCH), RISCV)
 C_SRC  += $(ROOT)/common/interrupts.c
-ifeq ($(RISCV_TYPE), TC906B)
-DEFS += -DCONFIG_TC906B
-CFLAGS += -DCONFIG_TC906B
-else
-DEFS += -DCONFIG_C906B
-CFLAGS += -DCONFIG_C906B
-endif
-
 CFLAGS += -DCONFIG_64BIT
 endif
 
@@ -122,6 +123,10 @@ ifeq ($(BOARD), QEMU)
 C_SRC += $(ROOT)/common/uart_pl01x.c
 else
 C_SRC += $(ROOT)/common/uart_dw.c
+endif
+
+ifeq ($(CHIP_NUM), MULTI)
+DEFS += -DCONFIG_SUPPORT_SMP
 endif
 
 A_SRC +=

@@ -54,16 +54,6 @@ static u32 make_adr_val(u32 address, u32 bit_i)
       ((bit_i & 0x1f) << NUM_ADDRESS_BITS);
 }
 
-// static void efuse_set_bit(u32 address, u32 bit_i)
-// {
-//   efuse_mode_reset();
-//   u32 adr_val = make_adr_val(address, bit_i);
-//   cpu_write32(EFUSE_ADR, adr_val);
-//   efuse_mode_md_write(0b11);
-//   efuse_mode_wait_ready();
-//   // while (cpu_read32(EFUSE_MODE) & 0x3);
-// }
-
 static void efuse_set_bit(uint32_t address, uint32_t bit_i)
 {
     const uint32_t address_mask = (1 << NUM_ADDRESS_BITS) - 1;
@@ -74,7 +64,7 @@ static void efuse_set_bit(uint32_t address, uint32_t bit_i)
         return;
 
     // embedded write
-    adr_val = (address & address_mask) | ((bit_i & 0x1f) << NUM_ADDRESS_BITS);                                                                                                                                                                    
+    adr_val = (address & address_mask) | ((bit_i & 0x1f) << NUM_ADDRESS_BITS);
     cpu_write32(EFUSE_MODE, adr_val);
     cpu_write32(EFUSE_MODE, cpu_read32(EFUSE_MODE) | 0x3);
     while (cpu_read32(EFUSE_MODE) & 0x3) {
@@ -102,7 +92,7 @@ u32 efuse_embedded_read(u32 address)
   efuse_mode_wait_ready();
   // while (cpu_read32(EFUSE_MODE) & 0x3);
   uartlog("--embedded read success\n");
-  
+
   return cpu_read32(EFUSE_RD_DATA);
 }
 
@@ -111,10 +101,6 @@ void efuse_embedded_write(u32 address, u32 val)
   for (int i = 0; i < 32; i++)
     if ((val >> i) & 1)
       efuse_set_bit(address, i);
-  // cpu_write32((u64)address, val);
-  // efuse_mode_md_write(0b11);
-  // efuse_mode_wait_ready();
-  // // while (cpu_read32(EFUSE_MODE) & 0x3);
 }
 
 
@@ -130,13 +116,6 @@ u32 efuse_ecc_read(u32 address)
    * 30 RW  1  ECC_EN,Enable the ECC engine to decode read out data.
    * 28 WO  1  Mask ECC data.MASK=H for original data,MASK=L for repairing data.
   */
-   //read out efuse and write into sram, once is ok
-  //  if(0 == ecc_read_cnt) {
-	// 	cpu_write32(EFUSE_MODE, (cpu_read32(EFUSE_MODE) | (0x3 << 30) | (0x1 << 28)));
-	// 	while (cpu_read32(EFUSE_MODE) & 0x80000000);
-	// 	ecc_read_cnt++;
-  //  }
-
    /**Step 1 : Make sure EFUSE_MODE[1:0] = 2’b00
       Step 1 : Program EFUSE_MODE[31:30] = 2’b11
       Step 3 : Wait EFUSE_MODE[31] return back to 1’b0.

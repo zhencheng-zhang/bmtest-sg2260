@@ -21,12 +21,13 @@
 #define pr_debug(x, args...)
 #endif
 
-
+/*#define SDIO_INTR			(46-32) // cxk add*/
+#define SDIO_INTR			136
 #define SD0_BASE 			0x29310000
 #define SD1_BASE			0x29320000
 #define SD2_BASE			0x29330000
 
-#define EMMC_BASE			0x29300000
+/*#define EMMC_BASE			0x29300000 */ // cxk del
 #if defined(TEST_SD0)
 #define SDIO_BASE			SD0_BASE
 #elif defined(TEST_SD1)
@@ -70,11 +71,12 @@ struct bm_mmc_params {
 };
 
 void bm_mmc_phy_init(struct mmc_host *host);
+void bm_mmc_hw_reset(struct mmc_host *host); // add cxk
 int bm_mmc_setup_host(struct bm_mmc_params *param, struct mmc_host *host);
 int bm_sd_card_detect(struct mmc_host *host);
 int bm_sd_card_lock(struct mmc_host *host);
 
-#define MMC_INIT_FREQ					(200 * 1000)
+#define MMC_INIT_FREQ					(25 * 1000 * 1000)
 #define SDCARD_TRAN_FREQ				(12 * 1000 * 1000)
 
 #define SDHCI_DMA_ADDRESS               0x00

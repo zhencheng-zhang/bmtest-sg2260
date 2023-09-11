@@ -1,0 +1,1 @@
+make clean; make TEST_CASE=pwm RUN_ENV=DDR BOARD=ASIC DEBUG=1

@@ -5,10 +5,8 @@ SHELL_EN	?= 1 #if 0, disable shell
 
 BOARD		?= PALLADIUM
 CHIP		?= SG2260
+CHIP_NUM	?= SINGLE #single or multi
 ARCH		?= RISCV
-
-# number of cores bmtest support
-SMP ?= 1
 
 V	?= 1
 
@@ -24,7 +22,7 @@ ROOT := $(shell pwd)
 OUTPUT_NAME := $(CHIP)
 OUTPUT_PATH := out
 RELEASE_PATH := release_out
-TOOL_PATH := $(shell pwd)/../../gcc-riscv/
+TOOL_PATH := $(shell pwd)/../../host-tools/
 
 include config.mk
 
@@ -41,7 +39,7 @@ ifneq ($(configs), )
 sinclude $(configs)
 endif
 
-CROSS_COMPILE := $(TOOL_PATH)/gcc-riscv64-unknown-elf/bin/riscv64-unknown-elf-
+CROSS_COMPILE := riscv64-unknown-elf-
 
 AS := $(CROSS_COMPILE)as
 CC := $(CROSS_COMPILE)gcc
@@ -98,7 +96,7 @@ $(CXX_OBJ): $(OUTPUT_PATH)/%.o: $(ROOT)/%
 	"$(CXX)" -c $(DEFS) $(CXXFLAGS) $< -o $@ $(INC)
 
 $(BIN_OBJ): $(OUTPUT_PATH)/%.o: $(ROOT)/%
-	"$(OBJCOPY)" -I binary -O elf64-littleaarch64 --binary-architecture aarch64 $< $@ 
+	"$(OBJCOPY)" -I binary -O elf64-littleaarch64 --binary-architecture aarch64 $< $@
 	"$(OBJCOPY)" --redefine-sym _binary_`echo $< | sed -z 's/[/.]/_/g'`_start=_binary_`echo $* | sed -z 's/[/.]/_/g'`_start $@
 
 $(ELF): $(A_OBJ) $(EXT_C_OBJ) $(C_OBJ) $(CXX_OBJ) $(LIB_OBJ) $(BIN_OBJ)
@@ -117,7 +115,7 @@ $(ASM): $(ELF)
 	$(OBJDUMP) -DS $^ > $@
 
 $(TEXT): $(BIN)
-	hexdump -ve '"%08x\n"' $^ > $@
+	hexdump -v -e '1/4 "%08x\n"' $^ > $@
 
 all_obj:
 	@echo "ASM OBJ:<"$(A_OBJ)">"

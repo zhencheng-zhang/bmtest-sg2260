@@ -49,7 +49,7 @@ void init_clk(void)
 
 void system_init(void)
 {
-	init_clk();
+	// init_clk();
 	uart_init(0);
 	irq_init();
 

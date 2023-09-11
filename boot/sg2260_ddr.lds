@@ -1,12 +1,11 @@
-OUTPUT_ARCH( "riscv" )
-ENTRY( entry_vector )
+ENTRY(entry_vector)
 /*
  * Only constant here
  * No function !
  */
 
 MEMORY {
-  RAM        (rwx): ORIGIN = 0x40000000, LENGTH = 0x02000000
+	RAM		(rwx): ORIGIN = 0x7010100000, LENGTH = 0x100000
 }
 STACK_SIZE = DEFINED(STACK_SIZE) ? STACK_SIZE : 0x80000;
 SECTIONS
@@ -45,11 +44,11 @@ SECTIONS
   . = ALIGN(8);
   __module_testcase_start = .;
   .module0.testcase :
-  {   
+  {
       KEEP(*(.module0.testcase))
   } > RAM
   .module1.testcase :
-  {   
+  {
       KEEP(*(.module1.testcase))
   } > RAM
   .module2.testcase :
@@ -97,7 +96,7 @@ SECTIONS
     __BSS_END__ = .;
   } >RAM
 
-  . = ALIGN(8); 
+  . = ALIGN(8);
   __DATA_LMA_START__ = LOADADDR(.data);
   __DATA_SIZE__      = SIZEOF(.data);
   __DATA_LMA_END__   = __DATA_LMA_START__ + __DATA_SIZE__ ;

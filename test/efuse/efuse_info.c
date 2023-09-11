@@ -71,9 +71,9 @@ static void parse_chip_cell(efuse_chip_t *e, u32 c)
 {
   e->flag = (c>>24)&0xff;
   e->bad_npus[1] = (c>>16)&0xff;
-  e->bad_npus[0] = (c>>8)&0xff;  
+  e->bad_npus[0] = (c>>8)&0xff;
   e->pll = PLL_MAX_VALUE - ((c>>4)&0x0f)*PLL_STEP;
-  e->result = c&0x0f;  
+  e->result = c&0x0f;
 }
 
 static int cell_is_dead(u32 c)
@@ -341,7 +341,7 @@ static void write_chip_info(const efuse_chip_t *e)
 
   addr = find_empty_cell(CELL_CHIP_START);
   value = CELL_TYPE_CHIP_INFO << 24;
-  value = value |((e->bad_npus[0])<<8) |((e->bad_npus[1])<<16); 
+  value = value |((e->bad_npus[0])<<8) |((e->bad_npus[1])<<16);
   value = value | (((PLL_MAX_VALUE - e->pll)/PLL_STEP)<<4) | (e->result);
   efuse_embedded_write(addr, value);
 }
@@ -349,9 +349,9 @@ static void write_chip_info(const efuse_chip_t *e)
 void efuse_chip_info_read(efuse_chip_t *e)
 {
   efuse_chip_init(e);
-  
+
   if(num_empty_cells() == efuse_num_cells()) {
-    uartlog("%s: all cell is empty, no chip info\n", __func__);  
+    uartlog("%s: all cell is empty, no chip info\n", __func__);
     return;
   }
 
@@ -359,7 +359,7 @@ void efuse_chip_info_read(efuse_chip_t *e)
   for (u32 i = CELL_CHIP_START; i < n; i++) {
     u32 v = efuse_embedded_read(i);
     if((v>>24) == CELL_TYPE_CHIP_INFO) {
-      uartlog("%s: find chip info in addr %d\n", __func__, i);  
+      uartlog("%s: find chip info in addr %d\n", __func__, i);
       parse_chip_cell(e, v);
       uartlog("efuse read:\n"
             "  bad_npu0: %d\n"
@@ -370,15 +370,15 @@ void efuse_chip_info_read(efuse_chip_t *e)
             e->bad_npus[1],
             e->pll,
             e->result);
-  
+
     }
   }
 }
 
 static int check_chip_info(efuse_chip_t *rd, efuse_chip_t *wt)
 {
-  if(rd->bad_npus[0] == wt->bad_npus[0] 
-    && rd->bad_npus[1] == wt->bad_npus[1] 
+  if(rd->bad_npus[0] == wt->bad_npus[0]
+    && rd->bad_npus[1] == wt->bad_npus[1]
     && rd->pll == wt->pll
     && rd->result == wt->result) {
     uartlog("%s: chip info is same\n", __func__);
@@ -429,12 +429,12 @@ int efuse_chip_info_write(const efuse_chip_t *e)
   if(check_chip_info(&rd_chip, (efuse_chip_t *)e) != 0) {
     uartlog("%s: start to write chip info\n", __func__);
     write_chip_info(e);
-	
-    efuse_chip_info_read(&rd_chip);  
-    uartlog("%s: check write chip info:\n", __func__);	
-    return check_chip_info(&rd_chip, (efuse_chip_t *)e);	
+
+    efuse_chip_info_read(&rd_chip);
+    uartlog("%s: check write chip info:\n", __func__);
+    return check_chip_info(&rd_chip, (efuse_chip_t *)e);
   } else {
-    uartlog("%s: chip info is same, cancel write chip info\n", __func__);		
+    uartlog("%s: chip info is same, cancel write chip info\n", __func__);
     return 0;
   }
 }
@@ -454,7 +454,7 @@ static void write_chip_SN(const efuse_SN_t *e)
     } else {
       value = e->SN[i] << 24 | e->SN[i+1] <<16 | e->SN[i+2] <<8 | e->SN[i+3];
 	i = i + 4;
-    }    
+    }
     efuse_embedded_write(addr, value);
     addr++;
   }
@@ -465,16 +465,16 @@ static void read_chip_SN(efuse_SN_t *e)
   u32 addr=0, i=0, value=0;
 
   if(num_empty_cells() == efuse_num_cells()) {
-    uartlog("%s: all cell is empty, no sn info\n", __func__);  
+    uartlog("%s: all cell is empty, no sn info\n", __func__);
     return;
   }
-  
+
   u32 n = efuse_num_cells();
   for (addr = 0; addr < n; addr++) {
     value = efuse_embedded_read(addr);
     if((value>>24) == CELL_TYPE_SN_INFO) {
-      uartlog("%s: find sn info in %d\n", __func__, addr);  
-      e->SN[0] = (value>>8) & 0xff;	
+      uartlog("%s: find sn info in %d\n", __func__, addr);
+      e->SN[0] = (value>>8) & 0xff;
       e->SN[1] = (value) & 0xff;
 
 	addr++;
@@ -482,8 +482,8 @@ static void read_chip_SN(efuse_SN_t *e)
         value = efuse_embedded_read(addr);
         e->SN[i+3] = value & 0xff;
         e->SN[i+2] = (value>>8) & 0xff;
-        e->SN[i+1] = (value>>16) & 0xff;	
-        e->SN[i] = (value>>24) & 0xff;        
+        e->SN[i+1] = (value>>16) & 0xff;
+        e->SN[i] = (value>>24) & 0xff;
         addr++;
       }
       uart_puts("read SN is ");
@@ -492,16 +492,15 @@ static void read_chip_SN(efuse_SN_t *e)
       }
       uartlog("\n");
       uartlog("\n");
-	  
     }
-  }  
+  }
 }
 
 static int check_SN(efuse_SN_t *rd, efuse_SN_t *wt)
 {
   for(int i=0; i<sizeof(efuse_SN_t); i++) {
     if(rd->SN[i] != wt->SN[i]) {
-      uartlog("%s: SN is different\n", __func__);		
+      uartlog("%s: SN is different\n", __func__);
       uart_puts("read SN is ");
       for(int j=0; j<sizeof(efuse_SN_t); j++) {
         uart_putc(rd->SN[j]);
@@ -515,10 +514,10 @@ static int check_SN(efuse_SN_t *rd, efuse_SN_t *wt)
       }
       uartlog("\n");
       uartlog("\n");
-      return -1; 
+      return -1;
     }
   }
-  uartlog("%s: SN is same: \n", __func__);	
+  uartlog("%s: SN is same: \n", __func__);
   uart_puts("SN = ");
   for(int j=0; j<sizeof(efuse_SN_t); j++) {
     uart_putc(wt->SN[j]);
@@ -541,13 +540,13 @@ int efuse_SN_write(const efuse_SN_t *e)
   if(check_SN(&rd_sn, (efuse_SN_t *)e) != 0) {
       uartlog("%s: start to write SN\n", __func__);
       write_chip_SN(e);
-	  
+
 	//check write SN
       read_chip_SN(&rd_sn);
       uartlog("%s: check write SN:\n", __func__);
       return check_SN(&rd_sn, (efuse_SN_t *)e);
   } else {
-    uartlog("%s: SN is same, cancel write SN\n", __func__);		
+    uartlog("%s: SN is same, cancel write SN\n", __func__);
     return 0;
   }
 }

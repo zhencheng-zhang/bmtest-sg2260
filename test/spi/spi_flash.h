@@ -5,9 +5,6 @@
 
 #define line()  do {uartlog("\n %s %d \n", __FILE__, __LINE__);} while(0)
 
-#define SPI0_BASE   0x07000180000
-#define SPI1_BASE   0x07002180000
-
 #define SPI_BASE    SPI0_BASE
 
 #define DO_SPI_FW_PROG

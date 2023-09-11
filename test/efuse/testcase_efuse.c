@@ -22,7 +22,7 @@ static void print_efuse()
 		val = efuse_embedded_read(i);
 		uartlog(" %8x", val);
 		if ((i + 1) % 4 == 0)
-	 		 uartlog("\n");
+	 		uartlog("\n");
 	}
 
 	efuse_embedded_write(0x6,0x12567f);
@@ -56,14 +56,14 @@ static void print_efuse()
 		val = efuse_embedded_read(i);
 		uartlog(" %8x", val);
 		if ((i + 1) % 4 == 0)
-	  		uartlog("\n");
+			uartlog("\n");
 	}
 	uartlog("\n 2 efuse_ecc_read:\n");
 	for(i=0; i < 14; i++){
 		val = efuse_ecc_read(i);
 		uartlog(" %8x", val);
 		if ((i + 1) % 4 == 0)
-	 		uartlog("\n");
+			uartlog("\n");
 	}
 }
 
@@ -88,21 +88,12 @@ static void print_efuse_info()
 
 int testcase_efuse(void)
 {
-	//efuse_embedded_write(4, (u32)0x80000000);
-	//efuse_embedded_write(11, (u32)0x20505958);
 	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)&~(1<<SOFT_RESET_EFUSE0_BIT));
 	mdelay(1);
 	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)|(1<<SOFT_RESET_EFUSE0_BIT));
 
 	uartlog("--after soft_reset_reg0---\n");
 
-	//efuse_info_t e;
-	//efuse_info_init(&e);
-	//e.bad_npus[0] = 10;
-	//e.bad_npus[1] = 24;
-	//memset(e.serdes_pcs, 0x00, sizeof(e.serdes_pcs));
-	//strcpy(e.signature, "'s Chip");
-	// addr
 	efuse_embedded_write(0x4,0x12345677);
 	efuse_embedded_write(0x5,0x1234567f);
 

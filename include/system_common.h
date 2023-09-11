@@ -209,7 +209,8 @@ static inline void opdelay(unsigned int times)
 #define ETH0_SBD_INTR_O 31
 #define ETH0_LPI_INTR_O 32
 #define EMMC_WAKEUP_INTR 113
-#define EMMC_INTR 112
+/*#define EMMC_INTR 112*/ 
+#define EMMC_INTR 134
 #define SD0_WAKEUP_INTR 107
 #define SD0_INTR 106
 #define SD1_WAKEUP_INTR 109
@@ -340,17 +341,12 @@ void cv_reset_deassert(uint32_t id);
 
 #define NUM_IRQ (256)
 
-#ifdef __riscv
 // cache operation api
 void dcache_disable(void);
 void dcache_enable(void);
 void inv_dcache_all(void);
 void clean_dcache_all(void);
 void inv_clean_dcache_all(void);
-#else
-void bringup_c906b(unsigned long addr);
-void bringup_tc906b(int coreID, unsigned long addr);
-#endif
 
 #ifdef __cplusplus
 }

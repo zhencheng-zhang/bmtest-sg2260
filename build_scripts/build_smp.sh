@@ -1,0 +1,1 @@
+make clean; make TEST_CASE=smp RUN_ENV=DDR BOARD=ASIC CHIP_NUM=MULTI
