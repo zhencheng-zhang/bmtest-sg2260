@@ -7,13 +7,14 @@
 #include "cli.h"
 
 #define TEST_WITH_TNTERRUPT  	1
+
+#define REG_TIMER_BASE			TIMER_BASE
+
+#ifdef CONFIG_CHIP_SG2042
 #define TIMER_INTR	 			100
-#define SOFT_RESET_REG0 		0x30013000		//bit[9] all timer reset
-#define SOFT_RESET_REG1 		0x30013004
-#define CLK_EN_REG1 			0x7030012004
-
-
-#define REG_TIMER_BASE				0x07030003000
+#elif CONFIG_CHIP_SG2260
+#define TIMER_INTR	 			29
+#endif
 
 #define REG_TIMER1_BASE				(REG_TIMER_BASE+0x00)
 #define REG_TIMER2_BASE				(REG_TIMER_BASE+0x14)
@@ -110,7 +111,7 @@ static int us1, us2;
 	}
 }
 
-void BM1684_timer_delay(int delay, int num)
+void BM1684_timer_delay(int delay, int num, int running_mode)
 {
 	// disable & user-defined count mode  ~0x01)|0x2
 	// disable & free-running count mode  ~0x03)|0
@@ -118,16 +119,22 @@ void BM1684_timer_delay(int delay, int num)
 	// set count
 	mmio_write_32((REG_TIMER1_LOADCONNT + 0x14*num), delay);
 
+	
+
 	us1 = timer_meter_get_us();
 	//need_loop = 1;
 	// enable
-	mmio_write_32((REG_TIMER1_CONTROL + 0x14*num),mmio_read_32(REG_TIMER1_CONTROL + 0x14*num)  | 0x01);
+	mmio_write_32((REG_TIMER1_CONTROL + 0x14*num),mmio_read_32(REG_TIMER1_CONTROL + 0x14*num)  | 0x01 | running_mode << 1);
+
+	uartlog("Init count: %0x, delay: %x, CR: %0x\n", mmio_read_32(REG_TIMER1_CURRENT_VALUE + 0x14*num), delay, mmio_read_32(REG_TIMER1_CONTROL + 0x14*num));
 
 	//writel(CLK_EN_REG0, readl(CLK_EN_REG0)&~(1<<20));
 	//mdelay(1);
 	//writel(CLK_EN_REG0, readl(CLK_EN_REG0)|(1<<20));
 
-
+	while (timer_meter_get_us() - us1 < 1500) {
+		uartlog("current count: %0x\n", mmio_read_32(REG_TIMER1_CURRENT_VALUE + 0x14*num));
+	}
 #if !TEST_WITH_TNTERRUPT
 	u32 curr_cnt1, curr_cnt2=0;
 	while (1) {
@@ -142,6 +149,110 @@ void BM1684_timer_delay(int delay, int num)
 	}
 #endif
 
+}
+
+static int reset_test(int argc, char **argv)
+{
+	uartlog("%s\n", __func__);
+	u32 num;
+	num = strtoul(argv[1], NULL, 10);
+
+	if(num > 7) {
+		uartlog("test timer, invalid args, num: 0~7\n");
+		return 0;
+	}
+
+	writel(SOFT_RESET_REG0, readl(SOFT_RESET_REG0)&~(1<<13));
+	sleep(1000);
+	writel(SOFT_RESET_REG0, readl(SOFT_RESET_REG0)|(1<<13));
+
+	u32 count;
+	count =1 * TIMER_CLK/1;  //fpga 50Mclk  5* 1��
+#ifdef	PLATFORM_PALLADIUM
+	count = 1000 * 50;       //pld 50M clk�� 1000΢��
+#endif
+
+	mmio_write_32((REG_TIMER1_CONTROL + 0x14*num),(mmio_read_32(REG_TIMER1_CONTROL + 0x14*num) & ~0x03)|0);//0x01)|0x2);	 //0x03)|0);
+	// set count
+	mmio_write_32((REG_TIMER1_LOADCONNT + 0x14*num), count);
+	// enable
+	mmio_write_32((REG_TIMER1_CONTROL + 0x14*num),mmio_read_32(REG_TIMER1_CONTROL + 0x14*num)  | 0x01);
+
+	uartlog("Init count: %0x\n", mmio_read_32(REG_TIMER1_CURRENT_VALUE + 0x14*num));
+
+	writel(SOFT_RESET_REG0, readl(SOFT_RESET_REG0)&~(1<<13));
+	sleep(1000);
+	writel(SOFT_RESET_REG0, readl(SOFT_RESET_REG0)|(1<<13));
+
+	uartlog("After reset count: %0x (check whether it's default value)\n", mmio_read_32(REG_TIMER1_CURRENT_VALUE + 0x14*num));
+
+	uartlog("Continue running, check whether it's work well\n");
+	mmio_write_32((REG_TIMER1_CONTROL + 0x14*num),(mmio_read_32(REG_TIMER1_CONTROL + 0x14*num) & ~0x03)|0);//0x01)|0x2);	 //0x03)|0);
+	// set count
+	mmio_write_32((REG_TIMER1_LOADCONNT + 0x14*num), count);
+	mmio_write_32((REG_TIMER1_CONTROL + 0x14*num),mmio_read_32(REG_TIMER1_CONTROL + 0x14*num)  | 0x01);
+	uartlog("Init count: %0x, delay: %x, CR: %0x\n", mmio_read_32(REG_TIMER1_CURRENT_VALUE + 0x14*num), count, mmio_read_32(REG_TIMER1_CONTROL + 0x14*num));
+	us1 = timer_meter_get_us();
+	while (timer_meter_get_us() - us1 < 1000) {
+		uartlog("current count: %0x\n", mmio_read_32(REG_TIMER1_CURRENT_VALUE + 0x14*num));
+	}
+
+  return 0;
+}
+
+static int clk_gating_test(int argc, char **argv)
+{
+	// uartlog("%s\n", __func__);
+	u32 num;
+	num = strtoul(argv[1], NULL, 10);
+
+	if(num > 7) {
+		uartlog("test timer, invalid args, num: 0~7\n");
+		return 0;
+	}
+
+	writel(SOFT_RESET_REG0, readl(SOFT_RESET_REG0)&~(1<<13));
+	// sleep(1000);
+	writel(SOFT_RESET_REG0, readl(SOFT_RESET_REG0)|(1<<13));
+
+	int clk_bit = 11;
+	writel(CLK_EN_REG0, readl(CLK_EN_REG0)&~(1<<clk_bit));
+	writel(CLK_EN_REG0, readl(CLK_EN_REG0)|(1<<clk_bit));
+
+	u32 count;
+	count =1 * TIMER_CLK/1;  //fpga 50Mclk  5* 1��
+#ifdef	PLATFORM_PALLADIUM
+	count = 1000 * 50;       //pld 50M clk�� 1000΢��
+#endif
+	mmio_write_32((REG_TIMER1_CONTROL + 0x14*num),(mmio_read_32(REG_TIMER1_CONTROL + 0x14*num) & ~0x03)|0);//0x01)|0x2);	 //0x03)|0);
+	// set count
+	mmio_write_32((REG_TIMER1_LOADCONNT + 0x14*num), count);
+	// enable
+	mmio_write_32((REG_TIMER1_CONTROL + 0x14*num),mmio_read_32(REG_TIMER1_CONTROL + 0x14*num)  | 0x01);
+
+	// uartlog("Init count: %0x, clk_bit: %d\n", mmio_read_32(REG_TIMER1_CURRENT_VALUE + 0x14*num), clk_bit);
+
+	us1 = timer_meter_get_us();
+	uint32_t timeline = timer_meter_get_us() - us1;
+	int gating = 0;
+	while (timeline < 1000) {
+		if (timeline > 20 && timeline < 40 && gating == 0) {
+			// gating
+			uartlog("gating \n");
+			gating = 1;
+			writel(CLK_EN_REG0, readl(CLK_EN_REG0)&(~(1<<clk_bit)));
+
+		} else if (timeline > 40 && gating == 1) {
+			// ungating
+			uartlog("ungating \n");
+			gating = 0;
+			writel(CLK_EN_REG0, readl(CLK_EN_REG0)|(1<<clk_bit));
+		}
+		// uartlog("%0x\n", mmio_read_32(REG_TIMER1_CURRENT_VALUE + 0x14*num));
+		timeline = timer_meter_get_us() - us1;
+	}
+	
+  return 0;
 }
 
 
@@ -166,14 +277,18 @@ static int test_timer(int argc, char **argv)
 	uartlog("%s\n", __func__);
 	u32 num;
 	num = strtoul(argv[1], NULL, 10);
+	u32 running_mode = strtoul(argv[2], NULL, 10);
+	if (running_mode != 1)
+		running_mode = 0;
+
 	if(num > 7) {
 		uartlog("test timer, invalid args, num: 0~7\n");
 		return 0;
 	}
 
-	writel(SOFT_RESET_REG0, readl(SOFT_RESET_REG0)&~(1<<9));
+	writel(SOFT_RESET_REG0, readl(SOFT_RESET_REG0)&~(1<<13));
 	sleep(1000);
-	writel(SOFT_RESET_REG0, readl(SOFT_RESET_REG0)|(1<<9));
+	writel(SOFT_RESET_REG0, readl(SOFT_RESET_REG0)|(1<<13));
 
 #if TEST_WITH_TNTERRUPT
 	request_irq(TIMER_INTR, timer_irq_handler, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_MASK, "timer int", (void *)&num);
@@ -191,7 +306,7 @@ static int test_timer(int argc, char **argv)
 
 	uartlog("count %d\n", count);
 	writel(GPIO0DATA,0xffffffff);
-	BM1684_timer_delay(count, num);
+	BM1684_timer_delay(count, num, running_mode);
 	writel(GPIO0DATA,0x0);
 
   return 0;
@@ -199,7 +314,9 @@ static int test_timer(int argc, char **argv)
 
 
 static struct cmd_entry test_cmd_list[] __attribute__ ((unused)) = {
-	{"timer", test_timer, 1, "timer [num]"},
+	{"timer", test_timer, 1, "timer [num] [running mode]"},
+	{"reset_test", reset_test, 1, "reset_test [num]"},
+	{"clk_gating_test", clk_gating_test, 1, "clk_gating_test [num]"},
 	{NULL, NULL, 0, NULL}
 };
 

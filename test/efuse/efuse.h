@@ -5,16 +5,21 @@
 
 u32 efuse_num_cells();
 
-#define SOFT_RESET_REG0 	0x30013000
-#define SOFT_RESET_REG1 	0x30013004
+#ifdef CONFIG_CHIP_SG2042
 #define SOFT_RESET_EFUSE0_BIT   6
 #define SOFT_RESET_EFUSE1_BIT   7
+#elif CONFIG_CHIP_SG2260
+#define SOFT_RESET_EFUSE0_BIT   10
+#define SOFT_RESET_EFUSE1_BIT   11
+#endif
 
-#define CLK_EN_REG0 		0x7030012000
 #define CLK_EN_EFUSE_BIT    20
 #define CLK_EN_APB_EFUSE_BIT    21
 
+#define SOFT_RESET_EFUSE_BIT	SOFT_RESET_EFUSE1_BIT
+#define EFUSE_BASE				EFUSE1_BASE
 
+#define BOOT_DONE_BIT		7
 
 /*
  * address: [0, efuse_num_cells() - 1]

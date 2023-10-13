@@ -48,9 +48,8 @@ struct dw_regs {
 
 static struct dw_regs *uart = (struct dw_regs *)UART0_BASE;
 
-#if 0
-void uart_putc(uint8_t ch);
-void uart_init(int port)
+#if 1
+void uart_init(int port, int baudrate)
 {
 	switch (port)
 	{
@@ -72,13 +71,13 @@ void uart_init(int port)
 	}
 
 #if (defined(BOARD_FPGA))
-	int baudrate = 115200;
+	// int baudrate = 115200;
 	int uart_clock = 25 * 1000 * 1000;
-#elif defined(BOARD_PALLADIUM)
-	int baudrate = 153600;
-	int uart_clock = 9600;
+#elif defined(PLATFORM_PALLADIUM)
+	// int baudrate = 153600;
+	int uart_clock = 153600;
 #else
-	int baudrate = 115200;
+	// int baudrate = 115200;
 	int uart_clock = 500 * 1000 * 1000;
 #endif
 

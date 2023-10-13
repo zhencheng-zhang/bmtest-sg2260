@@ -50,7 +50,7 @@ void init_clk(void)
 void system_init(void)
 {
 	// init_clk();
-	uart_init(0);
+	// uart_init(0, 153600);
 	irq_init();
 
 	printf("system init done\n");

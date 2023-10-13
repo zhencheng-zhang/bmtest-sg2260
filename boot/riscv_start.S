@@ -207,7 +207,7 @@ core_init_done:
 
 	.align 4
 trap_vector:
-	j trap_vector
+	/* j trap_vector */
 	j trap_entry
 	/* never reach here */
 	j die

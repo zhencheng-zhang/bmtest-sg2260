@@ -3,15 +3,12 @@
 
 /*
  * Organization of EFUSE_ADR register:
- *   [  i:   0]: i <= 6, address of 32-bit cell
+ *   [  i:   0]: i <= 7, address of 32-bit cell
  *   [i+6: i+1]: 5-bit bit index within the cell
  */
 
 #define NUM_ADDRESS_BITS 7
 
-// 070:3000:0000 - efuse0
-// 070:3000:1000 - efuse1
-#define EFUSE_BASE 07030000000
 // verified
 static const u64 EFUSE_MODE = EFUSE_BASE;
 static const u64 EFUSE_ADR = EFUSE_BASE + 0x4;
@@ -37,8 +34,10 @@ static void efuse_mode_md_write(u32 val)
 static void efuse_mode_wait_ready()
 {
   // bit[7]: efuse_rdy. after reset this bit is 0
-  while (cpu_read32(EFUSE_MODE) == 0x80)
-    ;
+  // while (cpu_read32(EFUSE_MODE) == 0x80)
+  //   ;
+  while ((cpu_read32(EFUSE_MODE) & 0b11) != 0)
+  ;
 }
 
 static void efuse_mode_reset()
@@ -54,25 +53,21 @@ static u32 make_adr_val(u32 address, u32 bit_i)
       ((bit_i & 0x1f) << NUM_ADDRESS_BITS);
 }
 
+/**
+ * For normal bit program use below method. 
+ * Step 1 : Program EFUSE_ADR 
+ * Step 2 : Program EFUSE_MODE[1:0] = 2’b11
+ * Step 3 : Wait EFUSE_MODE[1:0] return back to 2’b00. 
+        eFuse controller will program the bit pointed by EFUSE_ADR. 
+        As finished, return EFUSE_MODE[1:0] back to 2’b00. 
+*/
 static void efuse_set_bit(uint32_t address, uint32_t bit_i)
 {
-    const uint32_t address_mask = (1 << NUM_ADDRESS_BITS) - 1;
-    uint32_t adr_val;
-    int loop = 100;
-
-    if (address > ((1 << NUM_ADDRESS_BITS) - 1))
-        return;
-
-    // embedded write
-    adr_val = (address & address_mask) | ((bit_i & 0x1f) << NUM_ADDRESS_BITS);
-    cpu_write32(EFUSE_MODE, adr_val);
-    cpu_write32(EFUSE_MODE, cpu_read32(EFUSE_MODE) | 0x3);
-    while (cpu_read32(EFUSE_MODE) & 0x3) {
-        if (loop-- > 0)
-            opdelay(1);
-        else
-            break;
-    }
+    // efuse_mode_reset();
+    u32 adr_val = make_adr_val(address, bit_i);
+    cpu_write32(EFUSE_ADR, adr_val);
+    efuse_mode_md_write(0b11);
+    efuse_mode_wait_ready();
 }
 
 /**
@@ -91,7 +86,7 @@ u32 efuse_embedded_read(u32 address)
   efuse_mode_md_write(0b10);
   efuse_mode_wait_ready();
   // while (cpu_read32(EFUSE_MODE) & 0x3);
-  uartlog("--embedded read success\n");
+  // uartlog("--embedded read success\n");
 
   return cpu_read32(EFUSE_RD_DATA);
 }
@@ -130,13 +125,14 @@ u32 efuse_ecc_read(u32 address)
               are valid for each read.
     */
   if(0 == ecc_read_cnt) {
-    cpu_write32(EFUSE_MODE, (cpu_read32(EFUSE_MODE) | 0x3));
-    uartlog("--- write efuse mode success--\n");
+    // cpu_write32(EFUSE_MODE, (cpu_read32(EFUSE_MODE) | 0x3));
+    cpu_write32(EFUSE_MODE, (cpu_read32(EFUSE_MODE) | (0x3 << 30)));
+    // uartlog("--- write efuse mode success--\n");
     while (cpu_read32(EFUSE_MODE) & 0x80000000);
     ecc_read_cnt++;
   }
 
-  uartlog("---ecc read success--\n");
+  // uartlog("---ecc read success--\n");
 
   cpu_write32(EFUSE_ECCSRAM_ADR, adr_val);
   return cpu_read32(EFUSE_ECCSRAM_RDPORT);

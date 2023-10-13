@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-void uart_init(int port);
+void uart_init(int port, int baudrate);
 int uart_getc(void);
 int uart_tstc(void);
 void uart_putc(uint8_t ch);

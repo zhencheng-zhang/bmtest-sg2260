@@ -48,7 +48,15 @@ struct dw_regs {
 #define UART_FCR_DEFVAL	(UART_FCR_FIFO_EN | UART_FCR_RXSR | UART_FCR_TXSR)
 #define UART_LCR_8N1    0x03
 
+#define UART_INTR		80
+
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
+int uart_irq_handler(int irqn, void *priv)
+{
+	uartlog("-----HANDLE %s-------\n", __func__);
+	return 0;
+}
 
 static int uart_loopback_test(uint8_t data)
 {
@@ -60,25 +68,6 @@ static int uart_loopback_test(uint8_t data)
 		return -1;
 
 	return 0;
-}
-
-static inline void uart2_pinmux(void)
-{
-	int pin;
-
-	//pinmux uart2
-  // Pin Mux and IO Control Register for UART1_RX and UART2_TX (0x50010484)
-	pin = mmio_read_32(0x50010484);
-	pin = pin & ~(0x3 << 20);
-	pin = pin | 1 << 20;
-	mmio_write_32(0x50010484, pin);
-
-  // Pin Mux and IO Control Register for UART2_RX and GPIO0 (0x50010488)
-	pin = mmio_read_32(0x50010488);
-	pin = pin & ~(0x3 << 4);
-	pin = pin | 1 << 4;
-	mmio_write_32(0x50010488, pin);
-
 }
 
 static int do_test(int argc, char **argv)
@@ -93,25 +82,17 @@ static int do_test(int argc, char **argv)
 
 static int do_loop(int argc, char **argv)
 {
-	// int baudrate;
-	// struct dw_regs *send, *recv;
 	char ch = 0;
-
-	// uart2_pinmux();
-
-	// baudrate = strtoul(argv[1], NULL, 10);
-
-	// printf("baudrate %d\n", baudrate);
 
 loop:
 	uart_puts("bmtest uart loop test\n");
 	int str_len = 0;
 	do {
-		uart_init(0);
+		uart_init(1, 9600);
 		ch = (char)uart_getc();
 		uart_putc(ch);
-		uart_init(1);
-		uart_putc(ch);
+		// uart_init(1, 9600);
+		// uart_putc(ch);
 		str_len++;
 	} while (ch != '\n');
 
@@ -124,77 +105,20 @@ loop:
 	return 0;
 }
 
-static int test_uart0(int argc, char **argv)
+
+static int test_irq(int argc, char **argv)
 {
-	// int baudrate;
-	// struct dw_regs *send, *recv;
-	char ch = 0;
+	mmio_write_32(UART0_BASE + 0x4, 0xf);
+	request_irq(UART_INTR, uart_irq_handler, 0, "uart int", NULL);
 
-	// uart2_pinmux();
-
-	// baudrate = strtoul(argv[1], NULL, 10);
-
-	// printf("baudrate %d\n", baudrate);
-
-loop:
-	uart_puts("bmtest uart0 test\n");
-  int str_len = 0;
-	do {
-		uart_init(0);
-		ch = (char)uart_getc();
-		uart_putc(ch);
-    // uart_init(1);
-		// uart_putc(ch);
-    str_len++;
-	} while (ch != '\n');
-
-	if (str_len <= 1)
-    	return 0;
-
-	timer_mdelay(500);
-	goto loop;
-
-	return 0;
-}
-
-static int test_uart1(int argc, char **argv)
-{
-	// int baudrate;
-	// struct dw_regs *send, *recv;
-	char ch = 0;
-
-	// uart2_pinmux();
-
-	// baudrate = strtoul(argv[1], NULL, 10);
-
-	// printf("baudrate %d\n", baudrate);
-
-loop:
-	uart_puts("bmtest uart1 test\n");
-	int str_len = 0;
-	do {
-		uart_init(0);
-		ch = (char)uart_getc();
-		// uart_putc(ch);
-		uart_init(1);
-		uart_putc(ch);
-		str_len++;
-	} while (ch != '\n');
-
-	if (str_len <= 1)
-		return 0;
-
-	timer_mdelay(500);
-	goto loop;
-
+	// test_uart0(0, NULL);
 	return 0;
 }
 
 static struct cmd_entry test_cmd_list[] __attribute__((unused)) = {
 	{ "run", do_test, 0, NULL },
-	{ "test_uart0", test_uart0, 0, NULL },
-	{ "test_uart1", test_uart1, 0, NULL },
-	{ "test_uartall", do_loop, 1, "loop baudrate" },
+	{ "loop", do_loop, 1, "loop baudrate" },
+	{ "test_irq", test_irq, 0, NULL },
 	//{ "loop", do_loop, 3, "loop port master/slave baudrate" },
 	{ NULL, NULL, 0, NULL },
 };
@@ -203,7 +127,10 @@ int testcase_uart(void)
 {
 	int i, ret = 0;
 
+	// test_irq(0, NULL);
+
 	printf("enter uart test\n");
+
 	for (i = 0; i < ARRAY_SIZE(test_cmd_list) - 1; i++) {
 		command_add(&test_cmd_list[i]);
 	}

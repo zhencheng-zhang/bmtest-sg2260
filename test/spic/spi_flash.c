@@ -5,25 +5,43 @@
 #include "spi_flash.h"
 #include "timer.h"
 
-//#define writel(a, v)		writel((u64)a, v)
-//#define readl(a)		readl((u64)a)
+#define L1_CACHE_BYTES  64
 
-// interrupt flag
-static volatile int int_flag = 0;
 
-void write_int_flag(int val)
+void sync_i(void)
 {
-  int_flag = val;
+  asm volatile (".long 0x01b0000b");
 }
 
-int read_int_flag(void)
+void flush_dcache_range(u64 start, u64 end)
 {
-  return int_flag;
+	register unsigned long i asm("a0") = start & ~(L1_CACHE_BYTES - 1);
+	for (; i < end; i += L1_CACHE_BYTES)
+		asm volatile (".long 0x02b5000b"); /* dcache.cipa a0 */
+
+  sync_i();
+}
+
+#ifdef SPI_FLASH_CACHEABELE
+void flush_dcache_once(u64 start)
+{
+  flush_dcache_range(start, start + L1_CACHE_BYTES);
+}
+#else
+void flush_dcache_once(u64 start)
+{
+}
+#endif
+
+void flush_dcache_all(void)
+{
+  asm volatile (".long 0x0030000b");
+  sync_i();
 }
 
 int spi_irq_handler(int irqn, void *priv)
 {
-  void* spi_base = priv;
+  u64 spi_base = (u64)priv;
   /* avoid always in trap interrupt handler */
   writel(spi_base + REG_BM1680_SPI_INT_STS, readl(spi_base + REG_BM1680_SPI_INT_STS) & (~BM1680_SPI_INT_TRAN_DONE));
 
@@ -41,7 +59,7 @@ static inline u32 _check_reg_bits(volatile u32 *addr, u64 offset, u32 mask, u32 
     //   uartlog("reg_val: 0x%8x\n", reg_val);
     if ((reg_val & mask) != 0) {
       *((volatile u32 *)((u8 *)addr + offset)) = reg_val & mask;
-      uartlog("-----------check reg bit right\n");
+      // uartlog("-----------check reg bit right\n");
       return reg_val & mask;
       // return 1;
     }
@@ -91,7 +109,7 @@ u8 spi_non_data_tran(u64 spi_base, u8* cmd_buf, u32 with_cmd, u32 addr_bytes)
 
   if (int_stat == 0) {
     uartlog("non data timeout, int stat: 0x%08x\n", int_stat);
-    // return -1;
+    return -1;
   }
   writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //should flush FIFO after tran
 
@@ -165,7 +183,7 @@ u8 spi_data_out_tran(u64 spi_base, u8* src_buf, u8* cmd_buf, u32 with_cmd, u32 a
                       BM1680_SPI_INT_TRAN_DONE, 100000);
   if (int_stat == 0) {
     uartlog("data out timeout, int stat: 0x%08x\n", int_stat);
-    // return -1;
+    return -1;
   }
   writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);  //should flush FIFO after tran
   return 0;
@@ -213,7 +231,7 @@ u8 spi_data_in_tran(u64 spi_base, u8* dst_buf, u8* cmd_buf, u32 with_cmd, u32 ad
                       BM1680_SPI_INT_RD_FIFO, 10000000);
   if (int_stat == 0) {
     uartlog("no read FIFO int\n");
-    // return -1;
+    return -1;
   }
 
   /* get data */
@@ -246,7 +264,7 @@ u8 spi_data_in_tran(u64 spi_base, u8* dst_buf, u8* cmd_buf, u32 with_cmd, u32 ad
                       BM1680_SPI_INT_TRAN_DONE, 100000);
   if (int_stat == 0) {
     uartlog("data in timeout, int stat: 0x%08x\n", int_stat);
-    // return -1;
+    return -1;
   }
   writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);  //should flush FIFO after tran
   return 0;
@@ -293,7 +311,7 @@ u8 spi_in_out_tran(u64 spi_base, u8* dst_buf, u8* src_buf,  u32 with_cmd, u32 ad
     writel(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[i]);
   }
 
-  uartlog("----%s\n", __func__);
+  // uartlog("----%s\n", __func__);
 
   /* issue tran */
   writel(spi_base + REG_BM1680_SPI_INT_STS, 0);   //clear all int
@@ -309,7 +327,7 @@ u8 spi_in_out_tran(u64 spi_base, u8* dst_buf, u8* src_buf,  u32 with_cmd, u32 ad
 
   if (int_stat == 0) {
     uartlog("data in timeout\n");
-    // return -1;
+    return -1;
   }
 
   p_data = (u32*)dst_buf;
@@ -490,7 +508,7 @@ int do_sector_erase(u64 spi_base, u32 addr, u32 sector_num)
     u32 wait = 0;
     while(1) {
       spi_status = spi_read_status(spi_base);
-      if (((spi_status & SPI_STATUS_WIP) == 0 ) || (wait > 10000000000)) {
+      if (((spi_status & SPI_STATUS_WIP) == 0 ) || (wait > 1000000)) {
         uartlog("sector erase done, get status: 0x%02x, wait: %d\n", spi_status, wait);
         break;
       }
@@ -585,12 +603,14 @@ void spi_flash_read_by_page(u64 spi_base, u32 fa, u8 *data, u32 size)
   for (int i = 0; i < page_num; i++) {
     offset = i * SPI_PAGE_SIZE;
     spi_data_read(spi_base, data + offset, fa + offset, SPI_PAGE_SIZE);
+    uartlog("read one page done\n");
   }
 
   u32 remainder = size % SPI_PAGE_SIZE;
   if (remainder) {
     offset = page_num * SPI_PAGE_SIZE;
     spi_data_read(spi_base, data + offset, fa + offset, remainder);
+    uartlog("read remaind  %d bytes done\n", remainder);
   }
 #ifdef DEBUG
   //dump_hex((char *)"cmp_buf", (void *)data, size);
@@ -617,24 +637,7 @@ void spi_flash_set_dmmr_mode(u64 spi_base, u32 en)
 
 u64 spi_flash_map_enable(u8 enable)
 {
-  u64 spi_base = 0;
-  //u32 reg = 0;
-  if (enable) {
-    //reg = readl(TOP_CTLR_BASE_ADDR + REG_BM1680_TOP_IP_EN);
-    //reg &= ~BM1680_CHL_IP_EN_SF_REMAP_EN;
-    //writel(TOP_CTLR_BASE_ADDR + REG_BM1680_TOP_IP_EN, reg);
-#if 0
-    spi_base = SPI_CTLR_BASE_ADDR; //0xFFF00000
-#else
-    spi_base = SPI_BASE; //SPI_CTLR_BASE_ADDR_REMAP; //0x44000000
-#endif
-  } else {
-    //reg = readl(TOP_CTLR_BASE_ADDR + REG_BM1680_TOP_IP_EN);
-    //reg |= BM1680_CHL_IP_EN_SF_REMAP_EN;
-    //writel(TOP_CTLR_BASE_ADDR + REG_BM1680_TOP_IP_EN, reg);
-    spi_base = SPI_BASE;//SPI_CTLR_BASE_ADDR_REMAP; //0x44000000
-  }
-
+  u64 spi_base = SPI_BASE;
 
   return spi_base;
 }
@@ -650,7 +653,7 @@ void spi_flash_init(u64 spi_base)
 
   /* conf spi controller regs */
   tran_csr |= (0x03 << BM1680_SPI_TRAN_CSR_ADDR_BYTES_SHIFT);
-  tran_csr |= BM1680_SPI_TRAN_CSR_FIFO_TRG_LVL_4_BYTE;
+  tran_csr |= BM1680_SPI_TRAN_CSR_FIFO_TRG_LVL_8_BYTE;
   tran_csr |= BM1680_SPI_TRAN_CSR_WITH_CMD;
   writel(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
   //uartlog("%s:%d\n", __func__, __LINE__);
@@ -689,15 +692,15 @@ int spi_flash_program(u64 spi_base, u32 sector_addr, u32 len)
     int ret = memcmp(fw_buf + off, cmp_buf, xfer_size);
     if (ret != 0) {
       uartlog("memcmp failed\n");
-      //dump_hex((char *)"fw_buf", (void *)(fw_buf + off), 16);
-      //dump_hex((char *)"cmp_buf", (void *)cmp_buf, 32);
+      // dump_hex((char *)"fw_buf", (void *)(fw_buf + off), 16);
+      // dump_hex((char *)"cmp_buf", (void *)cmp_buf, 32);
       return ret;
     }
     uartlog("page read compare ok @%d\n", off);
     off += xfer_size;
   }
 
-  uartlog("--%s done!\n", __func__);
+  // uartlog("--%s done!\n", __func__);
 
   return 0;
 }

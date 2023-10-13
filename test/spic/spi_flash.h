@@ -5,13 +5,11 @@
 
 #define line()  do {uartlog("\n %s %d \n", __FILE__, __LINE__);} while(0)
 
-#define SPI_BASE    SPI0_BASE
-
 #define DO_SPI_FW_PROG
 #define DO_SPI_FW_PROG_BUF_ADDR     0x10100000 //0x45000000
 #define DO_SPI_FW_PROG_BUF_SIZE     0x400 		//0x10000
 
-#define PLATFORM_ASIC
+// #define PLATFORM_ASIC
 
 #ifdef PLATFORM_ASIC
 #define SPI_PAGE_SIZE           256
@@ -67,9 +65,29 @@
 #define SPI_STATUS_BP2          (0x01 << 4)
 #define SPI_STATUS_SRWD         (0x01 << 7)
 
+#ifdef CONFIG_CHIP_SG2042
 #define SPI0_INTR 108
 #define SPI1_INTR 109
-#define SPI_INTR  SPI0_INTR
+#define SOFT_RESET_SPI0_BIT 23
+#define SOFT_RESET_SPI1_BIT 24
+#elif CONFIG_CHIP_SG2260
+#define SPI0_INTR 37
+#define SPI1_INTR 38
+#define SOFT_RESET_SPI0_BIT 27
+#define SOFT_RESET_SPI1_BIT 28
+#endif
+
+#define SOFT_RESET_SPI_BIT SOFT_RESET_SPI0_BIT
+
+#define CLK_EN_SPI_BIT      9
+
+#define SPI_INTR    SPI0_INTR
+#define SPI_BASE    SPI0_BASE
+
+void flush_dcache_range(u64 start, u64 end);
+void flush_dcache_once(u64 start);
+void flush_dcache_all(void);
+void sync_i(void);
 
 u8 spi_reg_status(u64 spi_base, u8 cmd);
 u64 spi_flash_map_enable(u8 enable);
