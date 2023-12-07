@@ -7,7 +7,7 @@
  *   [i+6: i+1]: 5-bit bit index within the cell
  */
 
-#define NUM_ADDRESS_BITS 7
+#define NUM_ADDRESS_BITS 8
 
 // verified
 static const u64 EFUSE_MODE = EFUSE_BASE;
@@ -126,7 +126,7 @@ u32 efuse_ecc_read(u32 address)
     */
   if(0 == ecc_read_cnt) {
     // cpu_write32(EFUSE_MODE, (cpu_read32(EFUSE_MODE) | 0x3));
-    cpu_write32(EFUSE_MODE, (cpu_read32(EFUSE_MODE) | (0x3 << 30)));
+    cpu_write32(EFUSE_MODE, (cpu_read32(EFUSE_MODE) | (0x3 << 30) | 1<<28));
     // uartlog("--- write efuse mode success--\n");
     while (cpu_read32(EFUSE_MODE) & 0x80000000);
     ecc_read_cnt++;

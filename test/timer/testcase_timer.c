@@ -13,7 +13,7 @@
 #ifdef CONFIG_CHIP_SG2042
 #define TIMER_INTR	 			100
 #elif CONFIG_CHIP_SG2260
-#define TIMER_INTR	 			29
+#define TIMER_INTR	 			30
 #endif
 
 #define REG_TIMER1_BASE				(REG_TIMER_BASE+0x00)
@@ -215,7 +215,7 @@ static int clk_gating_test(int argc, char **argv)
 	// sleep(1000);
 	writel(SOFT_RESET_REG0, readl(SOFT_RESET_REG0)|(1<<13));
 
-	int clk_bit = 11;
+	int clk_bit = 12 + num;
 	writel(CLK_EN_REG0, readl(CLK_EN_REG0)&~(1<<clk_bit));
 	writel(CLK_EN_REG0, readl(CLK_EN_REG0)|(1<<clk_bit));
 
@@ -232,23 +232,27 @@ static int clk_gating_test(int argc, char **argv)
 
 	// uartlog("Init count: %0x, clk_bit: %d\n", mmio_read_32(REG_TIMER1_CURRENT_VALUE + 0x14*num), clk_bit);
 
+	int gating_time = 50;
+	int ungating_time = 100;
+	// const u64 gating_addr = 0x7050002000;
+
 	us1 = timer_meter_get_us();
 	uint32_t timeline = timer_meter_get_us() - us1;
 	int gating = 0;
 	while (timeline < 1000) {
-		if (timeline > 20 && timeline < 40 && gating == 0) {
+		if (timeline > gating_time && timeline < ungating_time && gating == 0) {
 			// gating
 			uartlog("gating \n");
 			gating = 1;
 			writel(CLK_EN_REG0, readl(CLK_EN_REG0)&(~(1<<clk_bit)));
 
-		} else if (timeline > 40 && gating == 1) {
+		} else if (timeline > ungating_time && gating == 1) {
 			// ungating
 			uartlog("ungating \n");
 			gating = 0;
 			writel(CLK_EN_REG0, readl(CLK_EN_REG0)|(1<<clk_bit));
 		}
-		// uartlog("%0x\n", mmio_read_32(REG_TIMER1_CURRENT_VALUE + 0x14*num));
+		uartlog("%0x\n", mmio_read_32(REG_TIMER1_CURRENT_VALUE + 0x14*num));
 		timeline = timer_meter_get_us() - us1;
 	}
 	

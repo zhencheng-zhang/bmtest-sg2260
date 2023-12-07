@@ -1,1 +1,1 @@
-const char fw_version_info[] = "44c5b8f8fef34099130da56c99b0be9a6537bf96";
+const char fw_version_info[] = "c3d54cd892d425517d006488b07aa6045c3e255a";

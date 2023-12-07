@@ -74,7 +74,7 @@ uint64_t handle_trap(uint64_t scause, uint64_t epc, struct pt_regs *regs)
 {
 	uint64_t is_int;
 
-	printf("handle_trap: scause=0x%08lx, epc=0x%08lx\n", scause, epc);
+	// printf("handle_trap: scause=0x%08lx, epc=0x%08lx\n", scause, epc);
 	is_int = (scause & MCAUSE_INT);
 	if ((is_int) && ((scause & MCAUSE_CAUSE)  == IRQ_M_EXT))
 		do_irq();

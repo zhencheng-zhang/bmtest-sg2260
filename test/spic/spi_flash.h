@@ -22,7 +22,7 @@
 #elif defined(PLATFORM_PALLADIUM)
 #define SPI_PAGE_SIZE           256
 #define SPI_SECTOR_SIZE         (SPI_PAGE_SIZE * 1024)
-#define SPI_MAX_SIZE            (SPI_SECTOR_SIZE * 64)
+#define SPI_MAX_SIZE            (SPI_SECTOR_SIZE * 64)	//16MB
 #else
 #error "Undefined PLATFORM"
 #endif
@@ -83,11 +83,6 @@
 
 #define SPI_INTR    SPI0_INTR
 #define SPI_BASE    SPI0_BASE
-
-void flush_dcache_range(u64 start, u64 end);
-void flush_dcache_once(u64 start);
-void flush_dcache_all(void);
-void sync_i(void);
 
 u8 spi_reg_status(u64 spi_base, u8 cmd);
 u64 spi_flash_map_enable(u8 enable);

@@ -48,13 +48,13 @@ struct dw_regs {
 #define UART_FCR_DEFVAL	(UART_FCR_FIFO_EN | UART_FCR_RXSR | UART_FCR_TXSR)
 #define UART_LCR_8N1    0x03
 
-#define UART_INTR		80
+#define UART_INTR	41
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 int uart_irq_handler(int irqn, void *priv)
 {
-	uartlog("-----HANDLE %s-------\n", __func__);
+	uartlog("----- IIR: %x irqn: %d ------\n", readl(UART0_BASE + 0x8), irqn);
 	return 0;
 }
 
@@ -80,27 +80,39 @@ static int do_test(int argc, char **argv)
 	return ret;
 }
 
+extern int cli_readline(char *prompt, char *cmdbuf);
+
 static int do_loop(int argc, char **argv)
 {
-	char ch = 0;
+	// uart_init();
 
-loop:
-	uart_puts("bmtest uart loop test\n");
-	int str_len = 0;
-	do {
-		uart_init(1, 9600);
-		ch = (char)uart_getc();
-		uart_putc(ch);
-		// uart_init(1, 9600);
-		// uart_putc(ch);
-		str_len++;
-	} while (ch != '\n');
+	uartlog("uart init success\n");
 
-	if (str_len <= 1)
-		return 0;
+	static char cli_command[65] = { 0, };
 
-	timer_mdelay(500);
-	goto loop;
+	// uint8_t c = (uint8_t)uart_getc();
+	// uart_putc(c);
+	// if (c == 'q')
+    // 	return 0;
+
+	while (1) {
+		int len = cli_readline("$ ", cli_command);
+
+		if (len > 0) {
+			uart_puts(cli_command);
+			uart_putc('\n');
+		} else if (len == 0) {
+		// repeat
+			continue;
+		} else if (len == -1) {
+		// interrupt
+			continue;
+		} else if (len == -2) {
+		// timeout
+			uart_puts("\nTimed out waiting for command\n");
+			return 0;
+		}
+	}
 
 	return 0;
 }
@@ -108,6 +120,7 @@ loop:
 
 static int test_irq(int argc, char **argv)
 {
+	// uart_log("LSR: %x\n", mmio_read_32(UART0_BASE+0xc));
 	mmio_write_32(UART0_BASE + 0x4, 0xf);
 	request_irq(UART_INTR, uart_irq_handler, 0, "uart int", NULL);
 
@@ -127,7 +140,7 @@ int testcase_uart(void)
 {
 	int i, ret = 0;
 
-	// test_irq(0, NULL);
+	test_irq(0, NULL);
 
 	printf("enter uart test\n");
 

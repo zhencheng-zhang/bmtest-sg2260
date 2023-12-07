@@ -44,6 +44,7 @@ void memset_dword_inc(void *buff, unsigned int start, unsigned int size)
  */
 int memcmp(const void *s1, const void *s2, size_t len)
 {
+	int cnt = 0;
 	const unsigned char *s = s1;
 	const unsigned char *d = s2;
 	unsigned char sc;
@@ -53,7 +54,8 @@ int memcmp(const void *s1, const void *s2, size_t len)
 		sc = *s++;
 		dc = *d++;
 		if (sc - dc)
-			return (sc - dc);
+			return cnt;
+		cnt++;
 	}
 
 	return 0;

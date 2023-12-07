@@ -7,6 +7,9 @@
 #define dll rbr
 #define dlm ier
 
+#define UART_PCLK	153600
+#define UART_BAUDRATE	9600
+
 struct dw_regs {
 	volatile uint32_t	rbr;		/* 0x00 Data register */
 	volatile uint32_t	ier;		/* 0x04 Interrupt Enable Register */
@@ -48,7 +51,7 @@ struct dw_regs {
 
 static struct dw_regs *uart = (struct dw_regs *)UART0_BASE;
 
-#if 1
+#if 0
 void uart_init(int port, int baudrate)
 {
 	switch (port)
@@ -99,7 +102,50 @@ void uart_init(int port, int baudrate)
 	uart->lcr = 3;
 }
 #else
-void uart_init(void) {}
+// void uart_init(void) {}
+int uart_init(void)
+{
+	unsigned int divisor;
+
+	unsigned int baudrate = UART_BAUDRATE;
+	unsigned int pclk = UART_PCLK;
+	uint32_t *usr = (uint32_t *)0x703000007c;
+
+	/* if any interrupt has been enabled, that means this uart controller
+	 * may be initialized by some one before, just use it without
+	 * reinitializing. such situation occur when main cpu and a53lite share
+	 * the same uart port. main cpu should bringup first, reinitialize uart
+	 * may cause unpredictable bug, especially disable all interrupts, which
+	 * will cause linux running on main cpu lose of interrupts and cannot
+	 * type into any character in serial console
+	 */
+	if (uart->ier == 0) {
+		while (1) {
+			if ((*usr & 0x1) != 0x1)
+				break;
+		}
+
+		divisor = pclk / (16 * baudrate);
+
+		uart->lcr = uart->lcr | UART_LCR_DLAB | UART_LCR_8N1;
+		uart->dll = divisor & 0xff;
+		uart->dlm = (divisor >> 8) & 0xff;
+		uart->lcr = uart->lcr & (~UART_LCR_DLAB);
+
+		uartlog("to set ier\n");
+
+		// uart->ier = 0x8f;
+		uart->ier = 0x80;
+		uart->mcr = UART_MCRVAL;
+		uart->fcr = UART_FCR_DEFVAL;
+
+		uart->lcr = 3;
+	}
+
+	// register_stdio(uart_getc, uart_putc);
+
+	return 0;
+}
 #endif
 
 void _uart_putc(uint8_t ch)

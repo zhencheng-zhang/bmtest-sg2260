@@ -8,6 +8,7 @@
 #include "bm_spi_nand.h"
 #include "command.h"
 #include "cli.h"
+#include "timer.h"
 
 #include "asm/encoding.h"
 #include "asm/csr.h"
@@ -60,12 +61,20 @@ int spi_flash_spic_fifo_rw_test(int argc, char **argv)
 
   writeb(spi_base + REG_BM1680_SPI_FIFO_PORT, data_b);
   uartlog("data_b filled 0x%x, fifo pt: 0x%08x\n", data_b, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
-  // data_b = 0x89;
-  // writeb(spi_base + REG_BM1680_SPI_FIFO_PORT, data_b);
-  // uartlog("data_b filled 0x%x, fifo pt: 0x%08x\n", data_b, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
 
-  // data_b = readb(spi_base + REG_BM1680_SPI_FIFO_PORT);
-  // uartlog("data_b read 0x%x, fifo pt: 0x%08x\n", data_b, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
+
+  data_b = 0x89;
+  writeb(spi_base + REG_BM1680_SPI_FIFO_PORT, data_b);
+  uartlog("data_b filled 0x%x, fifo pt: 0x%08x\n", data_b, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
+
+  // while (1) {
+  //   if ((readl(spi_base + REG_BM1680_SPI_FIFO_PT) & 0xff) <=0 )
+  //     break;
+  //   uartlog("data_w read 0x%x, fifo pt: 0x%08x\n", readw(spi_base + REG_BM1680_SPI_FIFO_PORT), readl(spi_base + REG_BM1680_SPI_FIFO_PT));
+  // }
+
+  data_b = readb(spi_base + REG_BM1680_SPI_FIFO_PORT);
+  uartlog("data_b read 0x%x, fifo pt: 0x%08x\n", data_b, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
   data_b = readb(spi_base + REG_BM1680_SPI_FIFO_PORT);
   uartlog("data_b read 0x%x, fifo pt: 0x%08x\n", data_b, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
 
@@ -84,7 +93,8 @@ int spi_flash_spic_fifo_rw_test(int argc, char **argv)
 
 int spi_flash_read_test(int argc, char **argv)
 {
-  u32 sector_addr = 0x0;
+  u32 sector_addr = strtoul(argv[1], NULL, 16);
+  uartlog("start addr: %x\n", sector_addr);
   u8 rdata[SPI_PAGE_SIZE];
   memset(rdata, 0x0, SPI_PAGE_SIZE);
 
@@ -149,10 +159,11 @@ int spi_flash_rw_test(int argc, char **argv)
     spi_flash_read_by_page(spi_base, sector_addr + off, rdata, SPI_PAGE_SIZE);
     int ret = memcmp(rdata, wdata, SPI_PAGE_SIZE);
 
+    dump_hex((char *)"wdata", (void *)wdata, SPI_PAGE_SIZE);
+    dump_hex((char *)"rdata", (void *)rdata, SPI_PAGE_SIZE);
+
     if (ret != 0) {
       uartlog("page program test memcmp failed: 0x%08x\n", ret);
-      dump_hex((char *)"wdata", (void *)wdata, SPI_PAGE_SIZE);
-      dump_hex((char *)"rdata", (void *)rdata, SPI_PAGE_SIZE);
       return ret;
     }
 	uartlog("page count %d rd wr cmp ok\n",i);
@@ -166,35 +177,48 @@ int spi_flash_full_chip_scan(u64 spi_base)
 {
   u32 off = 0;
   u32 xfer_size = 0;
-  u32 size = SPI_MAX_SIZE;
-  u8 *wdata = (u8 *)DO_SPI_FW_PROG_BUF_ADDR;
+  u32 size = SPI_PAGE_SIZE * 32;  //8kB
+  // u8 *wdata = (u8 *)DO_SPI_FW_PROG_BUF_ADDR;
   u32 sector_addr = 0x0;
 
-  do_sector_erase(spi_base, sector_addr, 16*256);
+  u8 wdata[SPI_PAGE_SIZE];
+  for (int i = 0; i < SPI_PAGE_SIZE; i++) {
+    wdata[i] = i & 0xff;//rand();
+  }
+
+  do_sector_erase(spi_base, sector_addr, 2);
 
   while (off < size) {
     if ((size - off) >= SPI_PAGE_SIZE)
       xfer_size = SPI_PAGE_SIZE;
     else
       xfer_size = size - off;
-    spi_flash_write_by_page(spi_base, sector_addr+off, wdata + off, xfer_size);
+    spi_flash_write_by_page(spi_base, sector_addr+off, wdata, xfer_size);
 
     u8 rdata[SPI_PAGE_SIZE];
     memset(rdata, 0x0, SPI_PAGE_SIZE);
     spi_flash_read_by_page(spi_base, sector_addr+off, rdata, xfer_size);
-    int ret = memcmp(rdata, wdata + off, SPI_PAGE_SIZE);
+    int ret = memcmp(rdata, wdata, SPI_PAGE_SIZE);
     if (ret != 0) {
-      uartlog("page program test memcmp failed: 0x%08x\n", ret);
+      uartlog("page program test memcmp failed in %d [%x, %x]\n", ret, wdata[ret], rdata[ret]);
       dump_hex((char *)"wdata", (void *)wdata, xfer_size);
       dump_hex((char *)"rdata", (void *)rdata, xfer_size);
       return ret;
     }
 
     uartlog("page read compare ok @%d\n", off);
+    uartlog("------------one page prog done------------\n");
     off += xfer_size;
   }
 
   // uartlog("%s done!\n", __func__);
+  return 0;
+}
+
+int spi_flash_full_chip_test(int argc, char **argv)
+{
+  spi_flash_full_chip_scan(spi_base);
+
   return 0;
 }
 
@@ -207,44 +231,46 @@ int spi_flash_program_test(void)
   return err;
 }
 
-void print_16bytes(u64 start_addr)
+void print_128bytes(u64 start_addr)
 {
-  // int cnt = 0;
-  u64 base = spi_base + start_addr/2;
+  int cnt = 0;
+  u64 base = spi_base + start_addr;
+  u32 data[32];
   int i;
-  for (i=0; i<16; i+=4) {
-    u32 data = readl(base + i);
 
+  u64 start = timer_get_tick();
+  for (i=0; i<32; i++)
+    data[i] = readl(base + i*4);
+  u64 end = timer_get_tick();
+  uartlog("start: %ld, end: %ld, intervel: %ld\n", start, end, end-start);
+
+  for (i=0; i<32; i++) {
     int j;
     for (j=0; j<4; j++)
-      uartlog("%02x\n", (data >> (j*8)) & 0xff);
+      uartlog("%02x ", (data[i] >> (j*8)) & 0xff);
+  
     // uartlog(" %08x", data);
-    // cnt ++;
-    // if (cnt % 4 == 0)
-    //   uartlog("\n");
+    cnt ++;
+    if (cnt % 4 == 0)
+      uartlog("\n");
   }
+  
 }
 
 int spi_dmmr_r_test(int argc, char **argv)
 {
-  // set clk div 00, 01, 10, 11
-  int i;
-  for (i=0; i<4; i++) {
-    // no read
-    // clear and set
-    writel(SPI_BASE+REG_BM1680_SPI_CTRL, readl(SPI_BASE + REG_BM1680_SPI_CTRL) & ~(0b11));
-    writel(SPI_BASE+REG_BM1680_SPI_CTRL, readl(SPI_BASE + REG_BM1680_SPI_CTRL) | i);
+  int div = strtol(argv[1], NULL, 10);
 
-    // 16M file
-    uartlog("First 16 bytes: \n");
-    print_16bytes(0);
+  spi_flash_set_dmmr_mode(spi_base, 0);
+  writel(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) & (~ 0x7ff) );
+  writel(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) | div);
+  spi_flash_set_dmmr_mode(spi_base, 1);
+  
+  u64 flash_offset = 16*1024*1024-128;
+  uartlog("128B from offset %lx: \n", flash_offset);
+  print_128bytes(flash_offset);
 
-    uartlog("Middle 16 bytes: \n");
-    print_16bytes(5592405);
-
-    uartlog("Last 16 bytes: \n");
-    print_16bytes(5592405*2-30);
-  }
+  spi_flash_set_dmmr_mode(spi_base, 0);
 
   return 0;
 }
@@ -257,6 +283,7 @@ static struct cmd_entry test_cmd_list[] __attribute__ ((unused)) = {
   {"write_test", spi_flash_write_test, 1, NULL},
   {"flash_test", spi_flash_rw_test, 1, NULL},
   {"dmmr_read_test", spi_dmmr_r_test, 1, NULL},
+  {"full_chip_test", spi_flash_full_chip_test, 1, NULL},
 	{NULL, NULL, 0, NULL}
 };
 

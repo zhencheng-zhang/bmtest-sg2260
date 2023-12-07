@@ -14,7 +14,7 @@
 #ifdef CONFIG_CHIP_SG2042
 #define WATCHDOG_INTR	 		99
 #elif CONFIG_CHIP_SG2260
-#define WATCHDOG_INTR	 		28
+#define WATCHDOG_INTR	 		29
 #endif
 
 #define REG_WDT				WDT_BASE
@@ -93,7 +93,7 @@ static int response_test(int argc, char **argv)
 	mmio_write_32(REG_WDT+WDT_CR, (rpl<<2) | (response_mode)<<1 | 0 );
 	//mmio_write_32(REG_WDT+WDT_CR, (rpl<<2)  );
 #ifdef	PLATFORM_PALLADIUM
-	mmio_write_32(REG_WDT+WDT_TORR, 0x2);
+	mmio_write_32(REG_WDT+WDT_TORR, 0x4);
 #else
 	// Timeout Range Register
 	//2^(16 + i)
@@ -117,8 +117,8 @@ static int response_test(int argc, char **argv)
 	timer_meter_start();
 	// uartlog("%s 0\n", __func__);
 
-	writel(CLK_EN_REG0, readl(CLK_EN_REG0)&~(1<<27));
-	writel(CLK_EN_REG0, readl(CLK_EN_REG0)|(1<<27));
+	writel(CLK_EN_REG0, readl(CLK_EN_REG0)&~(1<<24));
+	writel(CLK_EN_REG0, readl(CLK_EN_REG0)|(1<<24));
 
 	uartlog("Init CCVR: %x\n", mmio_read_32(REG_WDT+WDT_CCVR));
 
@@ -126,7 +126,8 @@ static int response_test(int argc, char **argv)
 	mmio_write_32(REG_WDT+WDT_CR, (mmio_read_32(REG_WDT+WDT_CR)) | 0x1 );
 	us1 = timer_meter_get_us();
 	uartlog("us1: %u\n", us1);
-	
+
+	mmio_write_32(REG_WDT+WDT_CRR,0x76);
 
 #ifdef	PLATFORM_PALLADIUM
 	while((timer_meter_get_us() -us1) < 10000)
@@ -170,6 +171,10 @@ int testcase_watchdog(void)
 	int i, ret = 0;
 
 	printf("enter watchdog test\n");
+
+	u32 is_rst = readl(TOP_BASE + 0x1c);
+	if (is_rst)
+		uartlog("CHIP have been reset!! 0x705000001c[%d]\n", is_rst);
 
 	for (i = 0; i < ARRAY_SIZE(test_cmd_list) - 1; i++) {
 		command_add(&test_cmd_list[i]);

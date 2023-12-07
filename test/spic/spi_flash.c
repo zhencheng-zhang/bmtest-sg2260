@@ -5,47 +5,15 @@
 #include "spi_flash.h"
 #include "timer.h"
 
-#define L1_CACHE_BYTES  64
-
-
-void sync_i(void)
-{
-  asm volatile (".long 0x01b0000b");
-}
-
-void flush_dcache_range(u64 start, u64 end)
-{
-	register unsigned long i asm("a0") = start & ~(L1_CACHE_BYTES - 1);
-	for (; i < end; i += L1_CACHE_BYTES)
-		asm volatile (".long 0x02b5000b"); /* dcache.cipa a0 */
-
-  sync_i();
-}
-
-#ifdef SPI_FLASH_CACHEABELE
-void flush_dcache_once(u64 start)
-{
-  flush_dcache_range(start, start + L1_CACHE_BYTES);
-}
-#else
-void flush_dcache_once(u64 start)
-{
-}
-#endif
-
-void flush_dcache_all(void)
-{
-  asm volatile (".long 0x0030000b");
-  sync_i();
-}
-
-int spi_irq_handler(int irqn, void *priv)
+static int spi_irq_handler(int irqn, void *priv)
 {
   u64 spi_base = (u64)priv;
+
+  // uartlog("In spi_irq_handler, INT_STS:%x, INT_NUM: %d \n", readl(spi_base + REG_BM1680_SPI_INT_STS), SPI_INTR);
   /* avoid always in trap interrupt handler */
   writel(spi_base + REG_BM1680_SPI_INT_STS, readl(spi_base + REG_BM1680_SPI_INT_STS) & (~BM1680_SPI_INT_TRAN_DONE));
 
-  uartlog("In spi_irq_handler, INT_EN:%x, INT_NUM: %d \n", readl(spi_base + REG_BM1680_SPI_INT_EN), SPI_INTR);
+  uartlog("%s  irqn=%d \n",__func__, irqn);
 	return 0;
 }
 
@@ -621,7 +589,9 @@ void spi_flash_soft_reset(u64 spi_base)
 {
   //SCK frequency = HCLK frequency / (2(SckDiv+ 1))
   //0x8C003 is default value, 0x200000 is softrst
-  writel(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) | 0x1<<21 | 0x3);
+  // {CPOL, CPHA} -> 4 modes
+  writel(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) | 0x1<<21 | 0x3 | 0x3<<12);
+  uartlog("mode: %d\n", (readl(spi_base + REG_BM1680_SPI_CTRL) >> 12) & 0b11);
   //uartlog("%s:%d\n", __func__, __LINE__);
   return;
 }
