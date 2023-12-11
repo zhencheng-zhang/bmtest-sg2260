@@ -84,6 +84,10 @@
 #define SPI_INTR    SPI0_INTR
 #define SPI_BASE    SPI0_BASE
 
+void writel_fence(u64 addr, u32 val);
+void writew_fence(u64 addr, u16 val);
+void writeb_fence(u64 addr, u8 val);
+
 u8 spi_reg_status(u64 spi_base, u8 cmd);
 u64 spi_flash_map_enable(u8 enable);
 

@@ -51,20 +51,20 @@ int spi_flash_spic_fifo_rw_test(int argc, char **argv)
   u16 data_w = 0xabcd;
   u8 data_b = 0xef;
 
-  writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //do flush FIFO before test
+  writel_fence(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //do flush FIFO before test
 
-  writel(spi_base + REG_BM1680_SPI_FIFO_PORT, data_dw);
+  writel_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, data_dw);
   uartlog("data_dw filled 0x%x, fifo pt: 0x%08x\n", data_dw, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
 
-  writew(spi_base + REG_BM1680_SPI_FIFO_PORT, data_w);
+  writew_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, data_w);
   uartlog("data_w filled 0x%x, fifo pt: 0x%08x\n", data_w, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
 
-  writeb(spi_base + REG_BM1680_SPI_FIFO_PORT, data_b);
+  writeb_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, data_b);
   uartlog("data_b filled 0x%x, fifo pt: 0x%08x\n", data_b, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
 
 
   data_b = 0x89;
-  writeb(spi_base + REG_BM1680_SPI_FIFO_PORT, data_b);
+  writeb_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, data_b);
   uartlog("data_b filled 0x%x, fifo pt: 0x%08x\n", data_b, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
 
   // while (1) {
@@ -84,7 +84,7 @@ int spi_flash_spic_fifo_rw_test(int argc, char **argv)
   data_dw = readl(spi_base + REG_BM1680_SPI_FIFO_PORT);
   uartlog("data_dw read 0x%x, fifo pt: 0x%08x\n", data_dw, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
 
-  writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //do flush FIFO after test
+  writel_fence(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //do flush FIFO after test
 
   // uartlog("%s done!\n", __func__);
 
@@ -262,8 +262,8 @@ int spi_dmmr_r_test(int argc, char **argv)
   int div = strtol(argv[1], NULL, 10);
 
   spi_flash_set_dmmr_mode(spi_base, 0);
-  writel(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) & (~ 0x7ff) );
-  writel(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) | div);
+  writel_fence(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) & (~ 0x7ff) );
+  writel_fence(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) | div);
   spi_flash_set_dmmr_mode(spi_base, 1);
   
   u64 flash_offset = 16*1024*1024-128;
@@ -289,13 +289,13 @@ static struct cmd_entry test_cmd_list[] __attribute__ ((unused)) = {
 
 int testcase_spi(void)
 {
-	writel(CLK_EN_REG0,readl(CLK_EN_REG0)&~(1 << CLK_EN_SPI_BIT));
+	writel_fence(CLK_EN_REG0,readl(CLK_EN_REG0)&~(1 << CLK_EN_SPI_BIT));
 	mdelay(1);
-	writel(CLK_EN_REG0,readl(CLK_EN_REG0)|(1 << CLK_EN_SPI_BIT));
+	writel_fence(CLK_EN_REG0,readl(CLK_EN_REG0)|(1 << CLK_EN_SPI_BIT));
 
-	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)&~(1<<SOFT_RESET_SPI_BIT));
+	writel_fence(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)&~(1<<SOFT_RESET_SPI_BIT));
 	mdelay(1);
-	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)|(1<<SOFT_RESET_SPI_BIT));
+	writel_fence(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)|(1<<SOFT_RESET_SPI_BIT));
 
   spi_flash_init(spi_base);
   

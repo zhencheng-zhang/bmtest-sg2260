@@ -17,6 +17,14 @@ u32 efuse_num_cells();
 #define CLK_EN_APB_EFUSE_BIT    17
 #define EFUSE_PD_BIT		8
 
+#define SCS					10
+#define SEC_REGION			11
+#define SEC_REGION_EXTRA	12
+#define W_LOCK				56
+#define W_LOCK_NUM			8
+#define KPUB_HASH			32
+#define KPUB_HASH_NUM		8
+
 #define SOFT_RESET_EFUSE_BIT	SOFT_RESET_EFUSE0_BIT
 #define EFUSE_BASE				EFUSE0_BASE
 #define SHADOW_REG_BASE			0x7040000800UL
@@ -33,3 +41,4 @@ u32 efuse_num_cells();
 u32 efuse_embedded_read(u32 address);
 void efuse_embedded_write(u32 address, u32 val);
 u32 efuse_ecc_read(u32 address);
+void efuse_reset(void);

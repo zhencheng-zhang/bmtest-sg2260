@@ -151,9 +151,9 @@ static int autoload_test(int argc, char **argv)
 	// }
 	for (i=0; i<EFUSE_MAX; i++) {
 		if (i == 11)
-			efuse_embedded_write(11, 0xfffffff1);
+			efuse_embedded_write(SEC_REGION, 0xfffffff0);
 		else if (i == 12)
-			efuse_embedded_write(12, 0xfffffffe);
+			efuse_embedded_write(SEC_REGION_EXTRA, 0xfffffffe);
 		else
 			efuse_embedded_write(i, i);
 		// if (efuse_embedded_read(i) != i)
@@ -163,7 +163,7 @@ static int autoload_test(int argc, char **argv)
 	autoload();
 	// mdelay(1);
 	int success = 1;
-	
+
 	for (i=0; i<EFUSE_MAX; i++) {
 		u64 shadow_reg_addr = SHADOW_REG_BASE + i*4;
 		// uartlog("%lx %x\n", shadow_reg_addr, readl(shadow_reg_addr));
@@ -194,13 +194,15 @@ static int rom_patch_test(int argc, char **argv)
 {
 	int i;
 
+	efuse_reset();
+
 	// for(i=0; i<ROM_PATCH_N; i++) {
 	// 	u64 rom_addr = ROM_BASE + i * 4;
 	// 	uartlog("%lx %x\n", rom_addr, readl(rom_addr));
 	// }
 
-	efuse_embedded_write(11, 0xfffffff4);
-	efuse_embedded_write(12, 0xfffffffe);
+	efuse_embedded_write(SEC_REGION, 0xfffffff0);
+	efuse_embedded_write(SEC_REGION_EXTRA, 0xfffffffe);
 
 	for(i=0; i<ROM_PATCH_N; i++) {
 		u32 addr_offset = ROM_PATCH_OFFSET + i * 2;
@@ -229,13 +231,81 @@ static int rom_patch_test(int argc, char **argv)
 // force to bootfrom rom
 static int boot_mode_test(int argc, char **argv)
 {
-	int scs_offset  = 10;
+	efuse_reset();
+
 	int boot_mode_bit = 12;
-	efuse_embedded_write(scs_offset, 1<<boot_mode_bit);
+	efuse_embedded_write(SCS, 1<<boot_mode_bit);
+
+	autoload();
 
 	// TODO: reset ap
 
 	return 0;
+}
+
+static int w_lock_test(int argc, char **argv)
+{
+	int i;
+
+	efuse_reset();
+
+	for(i=0; i<W_LOCK_NUM; i++)
+		efuse_embedded_write(W_LOCK+i, 0xffffffff);
+	// valid efuse_w_lock
+	autoload();
+
+	autoload_test(0, NULL);
+
+	return 0;
+}
+
+static int kpub_w_lock_test(int argc, char **argv)
+{
+	efuse_reset();
+	efuse_embedded_write(SEC_REGION, 0x1);
+
+	int i;
+	for(i=0; i<KPUB_HASH_NUM; i++)
+		efuse_embedded_write(KPUB_HASH+i, 0xffff);
+	autoload();
+	for(i=0; i<KPUB_HASH_NUM; i++)
+		efuse_embedded_write(KPUB_HASH+i, 0xffff0000);
+	
+	for(i=0; i<KPUB_HASH_NUM; i++) {
+		u64 shadow_reg_addr = SHADOW_REG_BASE + (KPUB_HASH+i) * 4;
+		uartlog("addr: %lx, val: %x, eb_r: %x\n", shadow_reg_addr, readl(shadow_reg_addr),
+													efuse_embedded_read(KPUB_HASH+i));
+	}
+	return 0;
+}
+
+static int kpub_r_lock_test(int argc, char **argv)
+{
+	int i;
+
+	efuse_reset();
+	
+	for(i=0; i<KPUB_HASH_NUM; i++)
+		efuse_embedded_write(KPUB_HASH+i, 0xffffffff);
+	efuse_embedded_write(SEC_REGION, 0x4);
+
+	autoload();
+	
+	for(i=0; i<KPUB_HASH_NUM; i++) {
+		u64 shadow_reg_addr = SHADOW_REG_BASE + (KPUB_HASH+i) * 4;
+		uartlog("addr: %lx, val: %x, eb_r: %x\n", shadow_reg_addr, readl(shadow_reg_addr),
+													efuse_embedded_read(KPUB_HASH+i));
+	}
+
+	return 0;
+}
+
+static int ecc_hanming_test(int argc, char **argv)
+{
+	efuse_embedded_write(0, 0b1010101010101010101010101001010);
+	efuse_embedded_write(1, 0b0010101010101010101010101001010);
+
+	uartlog("%x %x\n", efuse_ecc_read(0), efuse_ecc_read(1));
 }
 
 static struct cmd_entry test_cmd_list[] __attribute__((unused)) = {
@@ -245,6 +315,10 @@ static struct cmd_entry test_cmd_list[] __attribute__((unused)) = {
 	{ "autoload", autoload_test, 0, NULL },
 	{ "rom_patch", rom_patch_test, 0, NULL },
 	{ "boot_mode", boot_mode_test, 0, NULL },
+	{ "w_lock", w_lock_test, 0, NULL },
+	{ "kpub_w_lock", kpub_w_lock_test, 0, NULL },
+	{ "kpub_r_lock", kpub_r_lock_test, 0, NULL },
+	{ "ecc_hanming", ecc_hanming_test, 0, NULL },
 	//{ "loop", do_loop, 3, "loop port master/slave baudrate" },
 	{ NULL, NULL, 0, NULL },
 };
@@ -255,22 +329,7 @@ int testcase_efuse(void)
 
 	printf("Enter efuse test\n");
 
-	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)&~(1<<SOFT_RESET_EFUSE_BIT));
-	// mdelay(1);
-	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)|(1<<SOFT_RESET_EFUSE_BIT));
-
-	writel(CLK_EN_REG0,readl(CLK_EN_REG1)&~(1<<CLK_EN_EFUSE_BIT));
-	// mdelay(1);
-	uartlog("cyx clk gating\n");
-	writel(CLK_EN_REG0,readl(CLK_EN_REG1)|(1<<CLK_EN_EFUSE_BIT));
-
-	uartlog("EFUSE_MD: %0x\n", readl(EFUSE_BASE));
-	// wait BOOT_DONE in EFUSE_MD setiing to 1
-	while (1) {
-		if (readl(EFUSE_BASE) & (1<<BOOT_DONE_BIT))
-			break;
-	}
-	uartlog("boot done\n");
+	efuse_reset();
 
 	// writel(EFUSE_BASE, readl(EFUSE_BASE) | (1<<28));
 	// uartlog("EFUSE_MD: %0x\n", readl(EFUSE_BASE));

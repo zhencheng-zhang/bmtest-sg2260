@@ -22,7 +22,7 @@ ROOT := $(shell pwd)
 OUTPUT_NAME := $(CHIP)
 OUTPUT_PATH := out
 RELEASE_PATH := release_out
-TOOL_PATH := $(shell pwd)/../../host-tools/
+TOOL_PATH := /home/zzc/code/gcc-riscv/gcc-riscv64-unknown-elf/bin/
 
 include config.mk
 
@@ -39,7 +39,7 @@ ifneq ($(configs), )
 sinclude $(configs)
 endif
 
-CROSS_COMPILE := riscv64-unknown-elf-
+CROSS_COMPILE := $(TOOL_PATH)riscv64-unknown-elf-
 
 AS := $(CROSS_COMPILE)as
 CC := $(CROSS_COMPILE)gcc

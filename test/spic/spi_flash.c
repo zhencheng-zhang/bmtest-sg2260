@@ -5,13 +5,31 @@
 #include "spi_flash.h"
 #include "timer.h"
 
+void writel_fence(u64 addr, u32 val)
+{
+  writel(addr, val);
+  __asm__ volatile("fence iorw, iorw":::);
+}
+
+void writeb_fence(u64 addr, u8 val)
+{
+  writeb(addr, val);
+  __asm__ volatile("fence iorw, iorw":::);
+}
+
+void writew_fence(u64 addr, u16 val)
+{
+  writew(addr, val);
+  __asm__ volatile("fence iorw, iorw":::);
+}
+
 static int spi_irq_handler(int irqn, void *priv)
 {
   u64 spi_base = (u64)priv;
 
   // uartlog("In spi_irq_handler, INT_STS:%x, INT_NUM: %d \n", readl(spi_base + REG_BM1680_SPI_INT_STS), SPI_INTR);
   /* avoid always in trap interrupt handler */
-  writel(spi_base + REG_BM1680_SPI_INT_STS, readl(spi_base + REG_BM1680_SPI_INT_STS) & (~BM1680_SPI_INT_TRAN_DONE));
+  writel_fence(spi_base + REG_BM1680_SPI_INT_STS, readl(spi_base + REG_BM1680_SPI_INT_STS) & (~BM1680_SPI_INT_TRAN_DONE));
 
   uartlog("%s  irqn=%d \n",__func__, irqn);
 	return 0;
@@ -62,14 +80,14 @@ u8 spi_non_data_tran(u64 spi_base, u8* cmd_buf, u32 with_cmd, u32 addr_bytes)
   tran_csr |= BM1680_SPI_TRAN_CSR_FIFO_TRG_LVL_1_BYTE;
   tran_csr |= (with_cmd) ? BM1680_SPI_TRAN_CSR_WITH_CMD : 0;
 
-  writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //do flush FIFO before filling fifo
+  writel_fence(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //do flush FIFO before filling fifo
 
-  writel(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[0]);
+  writel_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[0]);
 
   /* issue tran */
-  writel(spi_base + REG_BM1680_SPI_INT_STS, 0);   //clear all int
+  writel_fence(spi_base + REG_BM1680_SPI_INT_STS, 0);   //clear all int
   tran_csr |= BM1680_SPI_TRAN_CSR_GO_BUSY;
-  writel(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
+  writel_fence(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
 
   /* wait tran done */
   u32 int_stat = _check_reg_bits((volatile u32*)spi_base, REG_BM1680_SPI_INT_STS,
@@ -79,7 +97,7 @@ u8 spi_non_data_tran(u64 spi_base, u8* cmd_buf, u32 with_cmd, u32 addr_bytes)
     uartlog("non data timeout, int stat: 0x%08x\n", int_stat);
     return -1;
   }
-  writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //should flush FIFO after tran
+  writel_fence(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //should flush FIFO after tran
 
   return 0;
 }
@@ -106,18 +124,18 @@ u8 spi_data_out_tran(u64 spi_base, u8* src_buf, u8* cmd_buf, u32 with_cmd, u32 a
   tran_csr |= BM1680_SPI_TRAN_CSR_FIFO_TRG_LVL_8_BYTE;
   tran_csr |= BM1680_SPI_TRAN_CSR_TRAN_MODE_TX;
 
-  writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //do flush FIFO before filling fifo
+  writel_fence(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //do flush FIFO before filling fifo
   if (with_cmd) {
     for (int i = 0; i < ((cmd_bytes - 1) / 4 + 1); i++) {
-      writel(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[i]);
+      writel_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[i]);
     }
   }
 
   /* issue tran */
-  writel(spi_base + REG_BM1680_SPI_INT_STS, 0);   //clear all int
-  writel(spi_base + REG_BM1680_SPI_TRAN_NUM, data_bytes);
+  writel_fence(spi_base + REG_BM1680_SPI_INT_STS, 0);   //clear all int
+  writel_fence(spi_base + REG_BM1680_SPI_TRAN_NUM, data_bytes);
   tran_csr |= BM1680_SPI_TRAN_CSR_GO_BUSY;
-  writel(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
+  writel_fence(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
   while ((readl(spi_base + REG_BM1680_SPI_FIFO_PT) & 0xf) != 0) {};   //wait for cmd issued
 
   /* fill data */
@@ -141,7 +159,7 @@ u8 spi_data_out_tran(u64 spi_base, u8* src_buf, u8* cmd_buf, u32 with_cmd, u32 a
     }
 
     for (int i = 0; i < ((xfer_size - 1) / 4 + 1); i++) {
-      writel(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[off / 4 + i]);
+      writel_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[off / 4 + i]);
     }
     off += xfer_size;
   }
@@ -153,7 +171,7 @@ u8 spi_data_out_tran(u64 spi_base, u8* src_buf, u8* cmd_buf, u32 with_cmd, u32 a
     uartlog("data out timeout, int stat: 0x%08x\n", int_stat);
     return -1;
   }
-  writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);  //should flush FIFO after tran
+  writel_fence(spi_base + REG_BM1680_SPI_FIFO_PT, 0);  //should flush FIFO after tran
   return 0;
 }
 
@@ -179,20 +197,20 @@ u8 spi_data_in_tran(u64 spi_base, u8* dst_buf, u8* cmd_buf, u32 with_cmd, u32 ad
   tran_csr |= BM1680_SPI_TRAN_CSR_FIFO_TRG_LVL_8_BYTE;
   tran_csr |= BM1680_SPI_TRAN_CSR_TRAN_MODE_RX;
 
-  writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //do flush FIFO before filling fifo
+  writel_fence(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //do flush FIFO before filling fifo
   if (with_cmd) {
     for (int i = 0; i < ((cmd_bytes - 1) / 4 + 1); i++) {
-      writel(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[i]);
+      writel_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[i]);
     }
   }
 
-  // writel(spi_base + REG_BM1680_SPI_INT_EN, BM1680_SPI_INT_RD_FIFO_EN);
+  // writel_fence(spi_base + REG_BM1680_SPI_INT_EN, BM1680_SPI_INT_RD_FIFO_EN);
 
   /* issue tran */
-  writel(spi_base + REG_BM1680_SPI_INT_STS, 0);   //clear all int
-  writel(spi_base + REG_BM1680_SPI_TRAN_NUM, data_bytes);
+  writel_fence(spi_base + REG_BM1680_SPI_INT_STS, 0);   //clear all int
+  writel_fence(spi_base + REG_BM1680_SPI_TRAN_NUM, data_bytes);
   tran_csr |= BM1680_SPI_TRAN_CSR_GO_BUSY;
-  writel(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
+  writel_fence(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
 
   /* check rd int to make sure data out done and in data started */
   u32 int_stat = _check_reg_bits((volatile u32*)spi_base, REG_BM1680_SPI_INT_STS,
@@ -234,7 +252,7 @@ u8 spi_data_in_tran(u64 spi_base, u8* dst_buf, u8* cmd_buf, u32 with_cmd, u32 ad
     uartlog("data in timeout, int stat: 0x%08x\n", int_stat);
     return -1;
   }
-  writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);  //should flush FIFO after tran
+  writel_fence(spi_base + REG_BM1680_SPI_FIFO_PT, 0);  //should flush FIFO after tran
   return 0;
 }
 
@@ -272,21 +290,21 @@ u8 spi_in_out_tran(u64 spi_base, u8* dst_buf, u8* src_buf,  u32 with_cmd, u32 ad
   tran_csr |= BM1680_SPI_TRAN_CSR_TRAN_MODE_TX;
   tran_csr |= BM1680_SPI_TRAN_CSR_TRAN_MODE_RX;
 
-  writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //do flush FIFO before filling fifo
+  writel_fence(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //do flush FIFO before filling fifo
   u32 total_out_bytes = addr_bytes + send_bytes +((with_cmd) ? 1 : 0);
   // in spi_flash_read_id: total_out_bytes=4
   for (int i = 0; i < ((total_out_bytes - 1) / 4 + 1); i++) {
-    writel(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[i]);
+    writel_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[i]);
   }
 
   // uartlog("----%s\n", __func__);
 
   /* issue tran */
-  writel(spi_base + REG_BM1680_SPI_INT_STS, 0);   //clear all int
+  writel_fence(spi_base + REG_BM1680_SPI_INT_STS, 0);   //clear all int
 
-  writel(spi_base + REG_BM1680_SPI_TRAN_NUM, get_bytes);
+  writel_fence(spi_base + REG_BM1680_SPI_TRAN_NUM, get_bytes);
   tran_csr |= BM1680_SPI_TRAN_CSR_GO_BUSY;
-  writel(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
+  writel_fence(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
 
   // trans cmd first
   /* wait tran done and get data */
@@ -302,7 +320,7 @@ u8 spi_in_out_tran(u64 spi_base, u8* dst_buf, u8* src_buf,  u32 with_cmd, u32 ad
   for (int i = 0; i < ((get_bytes - 1) / 4 + 1); i++) {
     p_data[i] = readl(spi_base + REG_BM1680_SPI_FIFO_PORT);
   }
-  writel(spi_base + REG_BM1680_SPI_FIFO_PT, 0);  //should flush FIFO after tran
+  writel_fence(spi_base + REG_BM1680_SPI_FIFO_PT, 0);  //should flush FIFO after tran
 
   return 0;
 }
@@ -590,7 +608,7 @@ void spi_flash_soft_reset(u64 spi_base)
   //SCK frequency = HCLK frequency / (2(SckDiv+ 1))
   //0x8C003 is default value, 0x200000 is softrst
   // {CPOL, CPHA} -> 4 modes
-  writel(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) | 0x1<<21 | 0x3 | 0x3<<12);
+  writel_fence(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) | 0x1<<21 | 0x3 | 0x3<<12);
   uartlog("mode: %d\n", (readl(spi_base + REG_BM1680_SPI_CTRL) >> 12) & 0b11);
   //uartlog("%s:%d\n", __func__, __LINE__);
   return;
@@ -600,7 +618,7 @@ void spi_flash_set_dmmr_mode(u64 spi_base, u32 en)
 {
   u32 reg_val = (en) ? BM1680_SPI_DMMR_EN : 0;
 
-  writel(spi_base + REG_BM1680_SPI_DMMR, reg_val);
+  writel_fence(spi_base + REG_BM1680_SPI_DMMR, reg_val);
  // uartlog("%s:%d\n", __func__, __LINE__);
   return;
 }
@@ -625,9 +643,9 @@ void spi_flash_init(u64 spi_base)
   tran_csr |= (0x03 << BM1680_SPI_TRAN_CSR_ADDR_BYTES_SHIFT);
   tran_csr |= BM1680_SPI_TRAN_CSR_FIFO_TRG_LVL_8_BYTE;
   tran_csr |= BM1680_SPI_TRAN_CSR_WITH_CMD;
-  writel(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
+  writel_fence(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
   //uartlog("%s:%d\n", __func__, __LINE__);
-  writel(spi_base + REG_BM1680_SPI_INT_EN, BM1680_SPI_INT_TRAN_DONE_EN);
+  writel_fence(spi_base + REG_BM1680_SPI_INT_EN, BM1680_SPI_INT_TRAN_DONE_EN);
   request_irq(SPI_INTR, spi_irq_handler, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_MASK, "spi int", (void *)spi_base);
 #ifdef DEBUG
   printf("check spi reg con[0x%08x]: 0x%08x\n", spi_base + REG_BM1680_SPI_CTRL,

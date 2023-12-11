@@ -1,5 +1,6 @@
 #include "system_common.h"
 #include "efuse.h"
+#include "sg2260_common.h"
 
 /*
  * Organization of EFUSE_ADR register:
@@ -16,6 +17,25 @@ static const u64 EFUSE_RD_DATA = EFUSE_BASE + 0xc;
 static const u64 EFUSE_ECCSRAM_ADR = EFUSE_BASE + 0x10;
 static const u64 EFUSE_ECCSRAM_RDPORT = EFUSE_BASE + 0x14;
 
+void efuse_reset(void)
+{
+  writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)&~(1<<SOFT_RESET_EFUSE_BIT));
+	// mdelay(1);
+	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)|(1<<SOFT_RESET_EFUSE_BIT));
+
+	writel(CLK_EN_REG0,readl(CLK_EN_REG1)&~(1<<CLK_EN_EFUSE_BIT));
+	// mdelay(1);
+	uartlog("cyx clk gating\n");
+	writel(CLK_EN_REG0,readl(CLK_EN_REG1)|(1<<CLK_EN_EFUSE_BIT));
+
+	uartlog("EFUSE_MD: %0x\n", readl(EFUSE_BASE));
+	// wait BOOT_DONE in EFUSE_MD setiing to 1
+	while (1) {
+		if (readl(EFUSE_BASE) & (1<<BOOT_DONE_BIT))
+			break;
+	}
+	uartlog("boot done\n");
+}
 
 /**
  * EFUSE_MD
