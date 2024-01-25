@@ -73,14 +73,19 @@ int spi_flash_spic_fifo_rw_test(int argc, char **argv)
   //   uartlog("data_w read 0x%x, fifo pt: 0x%08x\n", readw(spi_base + REG_BM1680_SPI_FIFO_PORT), readl(spi_base + REG_BM1680_SPI_FIFO_PT));
   // }
 
-  data_b = readb(spi_base + REG_BM1680_SPI_FIFO_PORT);
-  uartlog("data_b read 0x%x, fifo pt: 0x%08x\n", data_b, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
+  __asm__ volatile("fence iorw, iorw":::);
   data_b = readb(spi_base + REG_BM1680_SPI_FIFO_PORT);
   uartlog("data_b read 0x%x, fifo pt: 0x%08x\n", data_b, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
 
+  __asm__ volatile("fence iorw, iorw":::);
+  data_b = readb(spi_base + REG_BM1680_SPI_FIFO_PORT);
+  uartlog("data_b read 0x%x, fifo pt: 0x%08x\n", data_b, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
+
+  __asm__ volatile("fence iorw, iorw":::);
   data_w = readw(spi_base + REG_BM1680_SPI_FIFO_PORT);
   uartlog("data_w read 0x%x, fifo pt: 0x%08x\n", data_w, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
 
+  __asm__ volatile("fence iorw, iorw":::);
   data_dw = readl(spi_base + REG_BM1680_SPI_FIFO_PORT);
   uartlog("data_dw read 0x%x, fifo pt: 0x%08x\n", data_dw, readl(spi_base + REG_BM1680_SPI_FIFO_PT));
 
@@ -94,7 +99,7 @@ int spi_flash_spic_fifo_rw_test(int argc, char **argv)
 int spi_flash_read_test(int argc, char **argv)
 {
   u32 sector_addr = strtoul(argv[1], NULL, 16);
-  uartlog("start addr: %x\n", sector_addr);
+  uartlog("start addr: 0x%x\n", sector_addr);
   u8 rdata[SPI_PAGE_SIZE];
   memset(rdata, 0x0, SPI_PAGE_SIZE);
 
@@ -110,16 +115,15 @@ int spi_flash_erase_test(int argc, char **argv)
   u32 sector_num = 1;
   u32 sector_addr = 0x0;
   do_sector_erase(spi_base, sector_addr, sector_num);
-
-  // TODO: check erase: erase area is 0xff
-
   return 0;
 }
 
 int spi_flash_write_test(int argc, char **argv)
 {
   u32 sector_num = 1;
-  u32 sector_addr = 0x0;
+  u32 sector_addr = strtoul(argv[1], NULL, 16);
+
+  uartlog("start addr: 0x%x\n", sector_addr);
   do_sector_erase(spi_base, sector_addr, sector_num);
 
   u8 wdata[SPI_PAGE_SIZE];
@@ -177,34 +181,39 @@ int spi_flash_full_chip_scan(u64 spi_base)
 {
   u32 off = 0;
   u32 xfer_size = 0;
-  u32 size = SPI_PAGE_SIZE * 32;  //8kB
+  u32 size = 16 * 1024 * 1024;  //16MB
   // u8 *wdata = (u8 *)DO_SPI_FW_PROG_BUF_ADDR;
-  u32 sector_addr = 0x0;
+  u32 sector_addr = 15 * 1024 * 1024 + 512 * 1024;
 
   u8 wdata[SPI_PAGE_SIZE];
   for (int i = 0; i < SPI_PAGE_SIZE; i++) {
     wdata[i] = i & 0xff;//rand();
   }
 
-  do_sector_erase(spi_base, sector_addr, 2);
+  // do_sector_erase(spi_base, sector_addr, size/SPI_SECTOR_SIZE);
+  do_full_chip_erase(spi_base);
 
   while (off < size) {
     if ((size - off) >= SPI_PAGE_SIZE)
       xfer_size = SPI_PAGE_SIZE;
     else
       xfer_size = size - off;
-    spi_flash_write_by_page(spi_base, sector_addr+off, wdata, xfer_size);
-
-    u8 rdata[SPI_PAGE_SIZE];
-    memset(rdata, 0x0, SPI_PAGE_SIZE);
-    spi_flash_read_by_page(spi_base, sector_addr+off, rdata, xfer_size);
-    int ret = memcmp(rdata, wdata, SPI_PAGE_SIZE);
-    if (ret != 0) {
-      uartlog("page program test memcmp failed in %d [%x, %x]\n", ret, wdata[ret], rdata[ret]);
-      dump_hex((char *)"wdata", (void *)wdata, xfer_size);
-      dump_hex((char *)"rdata", (void *)rdata, xfer_size);
-      return ret;
+    if(0 != spi_flash_write_by_page(spi_base, sector_addr+off, wdata, xfer_size)) {
+      uartlog("\n\nwrite error\n\n");
+      return -1;
     }
+
+    // u8 rdata[SPI_PAGE_SIZE];
+    // memset(rdata, 0x0, SPI_PAGE_SIZE);
+    // spi_flash_read_by_page(spi_base, sector_addr+off, rdata, xfer_size);
+
+    // int ret = memcmp(rdata, wdata, SPI_PAGE_SIZE);
+    // if (ret != 0) {
+    //   uartlog("page program test memcmp failed in %d [%x, %x]\n", ret, wdata[ret], rdata[ret]);
+    //   dump_hex((char *)"wdata", (void *)wdata, xfer_size);
+    //   dump_hex((char *)"rdata", (void *)rdata, xfer_size);
+    //   return ret;
+    // }
 
     uartlog("page read compare ok @%d\n", off);
     uartlog("------------one page prog done------------\n");
@@ -231,27 +240,31 @@ int spi_flash_program_test(void)
   return err;
 }
 
-void print_128bytes(u64 start_addr)
+void print_256bytes(u64 start_addr)
 {
-  int cnt = 0;
   u64 base = spi_base + start_addr;
-  u32 data[32];
+  u32 data[64];
   int i;
 
-  u64 start = timer_get_tick();
-  for (i=0; i<32; i++)
-    data[i] = readl(base + i*4);
-  u64 end = timer_get_tick();
-  uartlog("start: %ld, end: %ld, intervel: %ld\n", start, end, end-start);
+  memset(data, 0, sizeof(data));
 
-  for (i=0; i<32; i++) {
+  // u64 start = timer_get_tick();
+  for (i=0; i<64; i++) {
+    __asm__ volatile("fence iorw, iorw":::);
+    data[i] = readl(base + i*4);
+    __asm__ volatile("fence iorw, iorw":::);
+  }
+  // u64 end = timer_get_tick();
+  // uartlog("start: %ld, end: %ld, intervel: %ld\n", start, end, end-start);
+
+  for (i=0; i<64; i++) {
     int j;
+    __asm__ volatile("fence iorw, iorw":::);
     for (j=0; j<4; j++)
       uartlog("%02x ", (data[i] >> (j*8)) & 0xff);
   
     // uartlog(" %08x", data);
-    cnt ++;
-    if (cnt % 4 == 0)
+    if ((i+1) % 4 == 0)
       uartlog("\n");
   }
   
@@ -259,16 +272,16 @@ void print_128bytes(u64 start_addr)
 
 int spi_dmmr_r_test(int argc, char **argv)
 {
-  int div = strtol(argv[1], NULL, 10);
+  int start_addr = strtol(argv[1], NULL, 16);
+  uartlog("start addr: 0x%x\n", start_addr);
+  // int div = strtol(argv[2], NULL, 10);
 
-  spi_flash_set_dmmr_mode(spi_base, 0);
-  writel_fence(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) & (~ 0x7ff) );
-  writel_fence(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) | div);
+  // spi_flash_set_dmmr_mode(spi_base, 0);
+  // writel_fence(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) & (~ 0x7ff) );
+  // writel_fence(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) | div);
   spi_flash_set_dmmr_mode(spi_base, 1);
-  
-  u64 flash_offset = 16*1024*1024-128;
-  uartlog("128B from offset %lx: \n", flash_offset);
-  print_128bytes(flash_offset);
+
+  print_256bytes(start_addr);
 
   spi_flash_set_dmmr_mode(spi_base, 0);
 

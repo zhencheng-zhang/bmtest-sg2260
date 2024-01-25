@@ -191,8 +191,8 @@ static int reset_test(int argc, char **argv)
 	// set count
 	mmio_write_32((REG_TIMER1_LOADCONNT + 0x14*num), count);
 	mmio_write_32((REG_TIMER1_CONTROL + 0x14*num),mmio_read_32(REG_TIMER1_CONTROL + 0x14*num)  | 0x01);
-	uartlog("Init count: %0x, delay: %x, CR: %0x\n", mmio_read_32(REG_TIMER1_CURRENT_VALUE + 0x14*num), count, mmio_read_32(REG_TIMER1_CONTROL + 0x14*num));
 	us1 = timer_meter_get_us();
+	uartlog("Init count: %0x, delay: %x, CR: %0x\n", mmio_read_32(REG_TIMER1_CURRENT_VALUE + 0x14*num), count, mmio_read_32(REG_TIMER1_CONTROL + 0x14*num));
 	while (timer_meter_get_us() - us1 < 1000) {
 		uartlog("current count: %0x\n", mmio_read_32(REG_TIMER1_CURRENT_VALUE + 0x14*num));
 	}

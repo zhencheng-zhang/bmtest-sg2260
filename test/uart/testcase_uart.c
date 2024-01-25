@@ -84,7 +84,10 @@ extern int cli_readline(char *prompt, char *cmdbuf);
 
 static int do_loop(int argc, char **argv)
 {
-	// uart_init();
+	u32 baudrate = strtol(argv[1], NULL, 10);
+
+	uartlog("change serial baudrate to fit %u\n", baudrate);
+	uart_init(baudrate);
 
 	uartlog("uart init success\n");
 
@@ -121,8 +124,8 @@ static int do_loop(int argc, char **argv)
 static int test_irq(int argc, char **argv)
 {
 	// uart_log("LSR: %x\n", mmio_read_32(UART0_BASE+0xc));
-	mmio_write_32(UART0_BASE + 0x4, 0xf);
-	request_irq(UART_INTR, uart_irq_handler, 0, "uart int", NULL);
+	// mmio_write_32(UART0_BASE + 0x4, 0xf);
+	// request_irq(UART_INTR, uart_irq_handler, 0, "uart int", NULL);
 
 	// test_uart0(0, NULL);
 	return 0;

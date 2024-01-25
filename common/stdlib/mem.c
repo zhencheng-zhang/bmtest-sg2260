@@ -53,9 +53,9 @@ int memcmp(const void *s1, const void *s2, size_t len)
 	while (len--) {
 		sc = *s++;
 		dc = *d++;
+		cnt++;
 		if (sc - dc)
 			return cnt;
-		cnt++;
 	}
 
 	return 0;

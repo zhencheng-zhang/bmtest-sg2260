@@ -1,6 +1,7 @@
 #include "system_common.h"
 #include "efuse.h"
 #include "sg2260_common.h"
+#include "timer.h"
 
 /*
  * Organization of EFUSE_ADR register:
@@ -19,14 +20,16 @@ static const u64 EFUSE_ECCSRAM_RDPORT = EFUSE_BASE + 0x14;
 
 void efuse_reset(void)
 {
-  writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)&~(1<<SOFT_RESET_EFUSE_BIT));
-	// mdelay(1);
-	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)|(1<<SOFT_RESET_EFUSE_BIT));
+  // writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)&~(1<<SOFT_RESET_EFUSE_BIT));
+	// // mdelay(501);
+	// writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)|(1<<SOFT_RESET_EFUSE_BIT));
 
-	writel(CLK_EN_REG0,readl(CLK_EN_REG1)&~(1<<CLK_EN_EFUSE_BIT));
+  // mdelay(501);
+
+	writel(CLK_EN_REG1,readl(CLK_EN_REG1)&~(1<<CLK_EN_EFUSE_BIT));
 	// mdelay(1);
 	uartlog("cyx clk gating\n");
-	writel(CLK_EN_REG0,readl(CLK_EN_REG1)|(1<<CLK_EN_EFUSE_BIT));
+	writel(CLK_EN_REG1,readl(CLK_EN_REG1)|(1<<CLK_EN_EFUSE_BIT));
 
 	uartlog("EFUSE_MD: %0x\n", readl(EFUSE_BASE));
 	// wait BOOT_DONE in EFUSE_MD setiing to 1
@@ -100,6 +103,7 @@ static void efuse_set_bit(uint32_t address, uint32_t bit_i)
 */
 u32 efuse_embedded_read(u32 address)
 {
+  address *= 2;
   efuse_mode_reset();
   u32 adr_val = make_adr_val(address, 0);
   cpu_write32(EFUSE_ADR, adr_val);
@@ -113,6 +117,7 @@ u32 efuse_embedded_read(u32 address)
 
 void efuse_embedded_write(u32 address, u32 val)
 {
+  address *= 2;
   for (int i = 0; i < 32; i++)
     if ((val >> i) & 1)
       efuse_set_bit(address, i);
@@ -121,9 +126,10 @@ void efuse_embedded_write(u32 address, u32 val)
 
 u32 efuse_ecc_read(u32 address)
 {
-   static int ecc_read_cnt = 0;
-   efuse_mode_reset();
-   u32 adr_val = make_adr_val(address, 0);
+  address *= 2;
+  static int ecc_read_cnt = 0;
+  efuse_mode_reset();
+  u32 adr_val = make_adr_val(address, 0);
 
 
   /**
@@ -145,8 +151,9 @@ u32 efuse_ecc_read(u32 address)
               are valid for each read.
     */
   if(0 == ecc_read_cnt) {
+    uartlog("ecc first read\n");
     // cpu_write32(EFUSE_MODE, (cpu_read32(EFUSE_MODE) | 0x3));
-    cpu_write32(EFUSE_MODE, (cpu_read32(EFUSE_MODE) | (0x3 << 30) | 1<<28));
+    cpu_write32(EFUSE_MODE, (cpu_read32(EFUSE_MODE) | (0x3 << 30)));
     // uartlog("--- write efuse mode success--\n");
     while (cpu_read32(EFUSE_MODE) & 0x80000000);
     ecc_read_cnt++;

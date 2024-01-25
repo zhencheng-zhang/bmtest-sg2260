@@ -17,6 +17,8 @@
 #define REG_BM1680_SPI_INT_STS                  0x028
 #define REG_BM1680_SPI_INT_EN                   0x02C
 
+#define REG_BM1680_SPI_OPT						0x030
+
 
 /* bit definition */
 #define BM1680_SPI_CTRL_CPHA                    (0x01 << 12)

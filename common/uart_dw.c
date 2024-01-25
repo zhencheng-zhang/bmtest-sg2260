@@ -103,13 +103,17 @@ void uart_init(int port, int baudrate)
 }
 #else
 // void uart_init(void) {}
-int uart_init(void)
+int uart_init(unsigned int baudrate)
 {
 	unsigned int divisor;
 
-	unsigned int baudrate = UART_BAUDRATE;
-	unsigned int pclk = UART_PCLK;
-	uint32_t *usr = (uint32_t *)0x703000007c;
+	// unsigned int baudrate = UART_BAUDRATE;
+	// unsigned int pclk = UART_PCLK;
+	unsigned int pclk = 25000000;
+	volatile uint32_t *usr = (uint32_t *)0x703000007c;
+
+	divisor = pclk / (16 * baudrate);
+	uartlog("divisor: %d\n", divisor);
 
 	/* if any interrupt has been enabled, that means this uart controller
 	 * may be initialized by some one before, just use it without
@@ -125,8 +129,6 @@ int uart_init(void)
 				break;
 		}
 
-		divisor = pclk / (16 * baudrate);
-
 		uart->lcr = uart->lcr | UART_LCR_DLAB | UART_LCR_8N1;
 		uart->dll = divisor & 0xff;
 		uart->dlm = (divisor >> 8) & 0xff;
@@ -135,7 +137,7 @@ int uart_init(void)
 		uartlog("to set ier\n");
 
 		// uart->ier = 0x8f;
-		uart->ier = 0x80;
+		uart->ier = 0;
 		uart->mcr = UART_MCRVAL;
 		uart->fcr = UART_FCR_DEFVAL;
 

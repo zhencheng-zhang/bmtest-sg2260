@@ -9,31 +9,6 @@
 #include "time.h"
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-#define L1_CACHE_BYTES 64
-
-static inline void CBO_flush(unsigned long start, unsigned long size)
-{
- register unsigned long i asm("a0") = start & ~(L1_CACHE_BYTES - 1);
- for (; i < (start+size); i += L1_CACHE_BYTES)
-  asm volatile (".long 0x025200f");
- 
-}
-
-static inline void CBO_clean(unsigned long start, unsigned long size)
-{
- register unsigned long i asm("a0") = start & ~(L1_CACHE_BYTES - 1);
- for (; i < (start+size); i += L1_CACHE_BYTES)
-  asm volatile (".long 0x015200f");
- 
-}
-
-static inline void CBO_inval(unsigned long start, unsigned long size)
-{
- register unsigned long i asm("a0") = start & ~(L1_CACHE_BYTES - 1);
- for (; i < (start+size); i += L1_CACHE_BYTES)
-  asm volatile (".long 0x005200f");
- 
-}
 
 static int print_efuse(int argc, char **argv)
 {
@@ -79,7 +54,7 @@ static int print_efuse(int argc, char **argv)
 			uartlog("\n");
 	}
 
-#if 1
+#if 0
 	// bit 6 in soft_reset_reg
 	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)&~(1<<SOFT_RESET_EFUSE_BIT));
 	mdelay(1);
@@ -127,11 +102,13 @@ static int embedded_read_test(int argc, char **argv)
 
 static void autoload(void)
 {
-	uartlog("Power down\n");
-	writel(EFUSE_BASE, readl(EFUSE_BASE) | (1 << EFUSE_PD_BIT));
+	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)&~(1<<SOFT_RESET_EFUSE_BIT));
+	writel(SOFT_RESET_REG0,readl(SOFT_RESET_REG0)|(1<<SOFT_RESET_EFUSE_BIT));
+	// uartlog("Power down\n");
+	// writel(EFUSE_BASE, readl(EFUSE_BASE) | (1 << EFUSE_PD_BIT));
 
-	uartlog("Power on\n");
-	writel(EFUSE_BASE, (readl(EFUSE_BASE) & ~(1 << EFUSE_PD_BIT) )| (1 << 28));
+	// uartlog("Power on\n");
+	// writel(EFUSE_BASE, (readl(EFUSE_BASE) & ~(1 << EFUSE_PD_BIT) )| (1 << 28));
 	
 	uartlog("Waiting autoload down\n");
 	while (1) {
@@ -149,11 +126,11 @@ static int autoload_test(int argc, char **argv)
 	// 	u64 shadow_reg_addr = SHADOW_REG_BASE + i*4;
 	// 	uartlog("%lx %x\n", shadow_reg_addr, readl(shadow_reg_addr));
 	// }
-	for (i=0; i<EFUSE_MAX; i++) {
-		if (i == 11)
-			efuse_embedded_write(SEC_REGION, 0xfffffff0);
-		else if (i == 12)
-			efuse_embedded_write(SEC_REGION_EXTRA, 0xfffffffe);
+	for (i=2; i<EFUSE_MAX; i++) {
+		if (i == SEC_REGION)
+			efuse_embedded_write(SEC_REGION, 0xffffffc0);
+		else if (i == SEC_REGION_EXTRA)
+			efuse_embedded_write(SEC_REGION_EXTRA, 0xffffffff);
 		else
 			efuse_embedded_write(i, i);
 		// if (efuse_embedded_read(i) != i)
@@ -193,27 +170,30 @@ static int autoload_test(int argc, char **argv)
 static int rom_patch_test(int argc, char **argv)
 {
 	int i;
+	u32 sec_val = 0xffffffc0;
+	u32 sec_extra_val = 0xffffffff;
 
-	efuse_reset();
+	// efuse_reset();
 
 	// for(i=0; i<ROM_PATCH_N; i++) {
 	// 	u64 rom_addr = ROM_BASE + i * 4;
 	// 	uartlog("%lx %x\n", rom_addr, readl(rom_addr));
 	// }
+	if (efuse_embedded_read(SEC_REGION) == sec_val) {
+		uartlog("first boot, writing rom patch\n");
+		efuse_embedded_write(SEC_REGION, sec_val);
+		efuse_embedded_write(SEC_REGION_EXTRA, sec_extra_val);
 
-	efuse_embedded_write(SEC_REGION, 0xfffffff0);
-	efuse_embedded_write(SEC_REGION_EXTRA, 0xfffffffe);
-
-	for(i=0; i<ROM_PATCH_N; i++) {
-		u32 addr_offset = ROM_PATCH_OFFSET + i * 2;
-		u32 patch_offset = addr_offset + 1;
-		u32 addr = (u32)(ROM_BASE + i * 4);
-		// uartlog("efuse_cell: %d rom_addr: %x\n", addr_offset, addr);
-		efuse_embedded_write(addr_offset, addr);
-		efuse_embedded_write(patch_offset, 0xffffffff);
+		for(i=0; i<ROM_PATCH_N; i++) {
+			u32 addr_offset = ROM_PATCH_OFFSET + i * 2;
+			u32 patch_offset = addr_offset + 1;
+			u32 addr = (u32)(ROM_BASE + i * 4);
+			// uartlog("efuse_cell: %d rom_addr: %x\n", addr_offset, addr);
+			efuse_embedded_write(addr_offset, addr);
+			efuse_embedded_write(patch_offset, 0xffffffff);
+		}
+		autoload();
 	}
-
-	autoload();
 
 	CBO_inval(ROM_BASE, ROM_PATCH_N * 4);
 
@@ -231,7 +211,7 @@ static int rom_patch_test(int argc, char **argv)
 // force to bootfrom rom
 static int boot_mode_test(int argc, char **argv)
 {
-	efuse_reset();
+	// efuse_reset();
 
 	int boot_mode_bit = 12;
 	efuse_embedded_write(SCS, 1<<boot_mode_bit);
@@ -284,13 +264,13 @@ static int kpub_r_lock_test(int argc, char **argv)
 	int i;
 
 	efuse_reset();
-	
+
 	for(i=0; i<KPUB_HASH_NUM; i++)
 		efuse_embedded_write(KPUB_HASH+i, 0xffffffff);
 	efuse_embedded_write(SEC_REGION, 0x4);
 
 	autoload();
-	
+
 	for(i=0; i<KPUB_HASH_NUM; i++) {
 		u64 shadow_reg_addr = SHADOW_REG_BASE + (KPUB_HASH+i) * 4;
 		uartlog("addr: %lx, val: %x, eb_r: %x\n", shadow_reg_addr, readl(shadow_reg_addr),
@@ -302,10 +282,30 @@ static int kpub_r_lock_test(int argc, char **argv)
 
 static int ecc_hanming_test(int argc, char **argv)
 {
-	efuse_embedded_write(0, 0b1010101010101010101010101001010);
-	efuse_embedded_write(1, 0b0010101010101010101010101001010);
+	// input raw data[25:0]: 10101010101010101010101010
+	// hanming code: 1010101010101010010101011010010
+	efuse_embedded_write(0, 0b1010101010101010010101011010010);
+	// modify bit 25
+	efuse_embedded_write(1, 0b0010101010101010010101011010010);
 
-	uartlog("%x %x\n", efuse_ecc_read(0), efuse_ecc_read(1));
+	// enable ecc
+	// uartlog("Power down\n");
+	// writel(EFUSE_BASE, readl(EFUSE_BASE) | (1 << EFUSE_PD_BIT));
+
+	// uartlog("Power on\n");
+	writel(EFUSE_BASE, (readl(EFUSE_BASE) & ~(1 << EFUSE_PD_BIT) & ~(1 << 28)));
+
+	// uartlog("Waiting autoload down\n");
+	// while (1) {
+	// 	if (readl(EFUSE_BASE) & (1<<BOOT_DONE_BIT))
+	// 		break;
+	// }
+	// uartlog("boot done\n");
+
+	uartlog("EFUSE_MD: %x\necc_r %x %x\n", readl(EFUSE_BASE),efuse_ecc_read(0), efuse_ecc_read(1));
+	uartlog("shadow reg %x %x\n", readl(SHADOW_REG_BASE), readl(SHADOW_REG_BASE + 4));
+
+	return 0;
 }
 
 static struct cmd_entry test_cmd_list[] __attribute__((unused)) = {

@@ -9,6 +9,7 @@
 #include "timer.h"
 #include "dma.h"
 #include "mmio.h"
+#include "cache.h"
 
 //uint64_t *dma_addr_first;
 uint64_t *dma_addr_prev;
@@ -28,6 +29,79 @@ u32 txrx_count = 0;
 * dma turn off
 */
 
+
+#define L1_CACHE_BYTES 64
+
+static void CBO_flush(unsigned long start, unsigned long size)
+{
+	register unsigned long i asm("a0") = start & ~(L1_CACHE_BYTES - 1);
+	for (; i < (start+size); i += L1_CACHE_BYTES)
+		asm volatile (".long 0x025200f");
+ 
+}
+
+// static void CBO_clean(unsigned long start, unsigned long size)
+// {
+// 	register unsigned long i asm("a0") = start & ~(L1_CACHE_BYTES - 1);
+// 	for (; i < (start+size); i += L1_CACHE_BYTES)
+//  		asm volatile (".long 0x015200f");
+ 
+// }
+
+static void CBO_inval(unsigned long start, unsigned long size)
+{
+	register unsigned long i asm("a0") = start & ~(L1_CACHE_BYTES - 1);
+	for (; i < (start+size); i += L1_CACHE_BYTES)
+		asm volatile (".long 0x005200f");
+ 
+}
+
+#define DMAC_WRITE(offset, value) \
+	do { \
+		writeq(DMAC_BASE + offset , (uint64_t)value); \
+		__asm__ volatile("fence iorw, iorw":::); \
+		CBO_flush(DMAC_BASE + offset, 8); \
+		__asm__ volatile("fence iorw, iorw":::); \
+	} while (0)
+
+unsigned long long DMAC_READ(int offset)
+{
+	CBO_inval(DMAC_BASE + offset, 8);
+	__asm__ volatile("fence iorw, iorw":::);
+	return readq(DMAC_BASE + offset);
+}
+
+#define DMA_CHAN_WRITE(chan, offset, value) \
+	do { \
+		writeq((uint64_t)(DMA_CHAN_BASE + ((chan * 0x100) +offset)), (uint64_t)(value)); \
+		__asm__ volatile("fence iorw, iorw":::); \
+		CBO_flush((unsigned long)DMA_CHAN_BASE + ((chan * 0x100) +offset), 8); \
+		__asm__ volatile("fence iorw, iorw":::); \
+	} while (0)
+
+unsigned long long DMA_CHAN_READ(int chan, int offset)
+{
+	CBO_inval(DMA_CHAN_BASE + ((chan * 0x100) + offset), 8);
+	__asm__ volatile("fence iorw, iorw":::);
+	return readq((uint64_t)(DMA_CHAN_BASE + ((chan * 0x100) + offset)));
+}
+
+
+#define LLI_WRITE(addr, offset, value) \
+	do { \
+		*(addr + (offset / 8)) = (uint64_t)(value); \
+		__asm__ volatile("fence iorw, iorw":::); \
+		CBO_flush((unsigned long)addr + (offset / 8), 8); \
+		__asm__ volatile("fence iorw, iorw":::); \
+	} while (0)
+
+unsigned long long LLI_READ(u64 addr, int offset) \
+{
+	CBO_flush(addr + offset, 8);
+	__asm__ volatile("fence iorw, iorw":::);
+	return readq(addr + offset);
+}
+
 void dma_turn_off()
 {
 	DMAC_WRITE(0x10, 0x0);
@@ -43,6 +117,22 @@ void dma_reset()
 	printf("%s\n", __func__);
 	DMAC_WRITE(0x58, 0x1);
 
+}
+
+static void dump_lli_content(uint64_t * llp_first, int count)
+{
+	int i;
+	uint64_t * llp = llp_first;
+	for(i = 0;i < count;i++,llp += 4) {
+		CBO_flush((unsigned long)llp, 0x40);
+		printf("lli			: %d, %p\n", i, llp);
+		printf("sar			: 0x%lx\n", *llp++);
+		printf("dar			: 0x%lx\n", *llp++);
+		printf("block ts		: 0x%lx\n", *llp++);
+		printf("llp			: 0x%lx\n", *llp++);
+		printf("ctl			: 0x%lx\n", *llp);
+		printf("\n");
+	}
 }
 
 void dma_mem2dev_setting(unsigned int *src_addr, unsigned int len, unsigned int *reg, unsigned int p_dev)
@@ -140,6 +230,7 @@ void dma_mem2dev_setting(unsigned int *src_addr, unsigned int len, unsigned int 
 				llp_addr += (LLI_SIZE/8);
 			}
 		}
+		uartlog("TX llp_addr: %p sar: %p dar: %p ctl: %lx\n", llp_addr, src_addr + (offset / 4), reg, ctl | 1UL << 63);
 
 		LLI_WRITE(llp_addr, 0x0, src_addr + (offset / 4)); //sar, offset is 64 bytes
 		LLI_WRITE(llp_addr, 0x8, reg); //dar
@@ -158,6 +249,7 @@ void dma_mem2dev_setting(unsigned int *src_addr, unsigned int len, unsigned int 
 		i++;
 	}
 	LLI_WRITE(dma_addr_prev, 0x20, ctl | 3LL << 62);//set llp the last block
+	dump_lli_content(llp_addr, 1);
 	debug("TX alocate %d LLI\n", i);
 }
 
@@ -360,6 +452,8 @@ void dma_dev2mem_setting(unsigned int *src_addr, unsigned int len, unsigned int 
 				llp_addr += (LLI_SIZE/8);
 			}
 		}
+		uartlog("RX llp_addr: %p sar: %p dar: %p ctl: %lx\n", llp_addr, reg, src_addr + (offset / 4), ctl | 1UL << 63);
+
 		LLI_WRITE(llp_addr, 0x0, reg); //sar
 		LLI_WRITE(llp_addr, 0x8, src_addr + (offset / 4)); //dar, offset is 64 bytes
 

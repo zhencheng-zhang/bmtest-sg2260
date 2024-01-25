@@ -22,7 +22,7 @@ ROOT := $(shell pwd)
 OUTPUT_NAME := $(CHIP)
 OUTPUT_PATH := out
 RELEASE_PATH := release_out
-TOOL_PATH := /home/zzc/code/gcc-riscv/gcc-riscv64-unknown-elf/bin/
+TOOL_PATH := /home/zzc/code/gcc-riscv/gcc-riscv64-unknown-elf-old/bin/
 
 include config.mk
 

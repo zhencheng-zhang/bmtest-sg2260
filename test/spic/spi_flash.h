@@ -21,8 +21,10 @@
 #define SPI_MAX_SIZE            (SPI_SECTOR_SIZE * 64)
 #elif defined(PLATFORM_PALLADIUM)
 #define SPI_PAGE_SIZE           256
-#define SPI_SECTOR_SIZE         (SPI_PAGE_SIZE * 1024)
-#define SPI_MAX_SIZE            (SPI_SECTOR_SIZE * 64)	//16MB
+// #define SPI_SECTOR_SIZE         (SPI_PAGE_SIZE * 1024)
+#define SPI_SECTOR_SIZE         (64 * 1024)
+// #define SPI_MAX_SIZE            (SPI_SECTOR_SIZE * 64)	//16MB
+#define SPI_MAX_SIZE            (64 * 1024 * 1024)	//16MB
 #else
 #error "Undefined PLATFORM"
 #endif
@@ -52,10 +54,16 @@
 #define SPI_CMD_WRSR3           0x11
 
 #define SPI_CMD_READ            0x03
+#define SPI_CMD_READ_4B			0x13
 #define SPI_CMD_FAST_READ       0x0B
 #define SPI_CMD_PP              0x02
-#define SPI_CMD_SE              0xD8    //64kb block erase
-#define SPI_CMD_BE              0xC7
+#define SPI_CMD_PP_4B			0x12
+#define SPI_CMD_BE              0xD8    //64kb block erase
+#define SPI_CMD_SE              0x20
+#define SPI_CMD_CE              0xC7
+
+#define SPI_CMD_EN4B			0xB7
+#define SPI_CMD_EX4B			0xE9
 
 
 #define SPI_STATUS_WIP          (0x01 << 0)
@@ -101,7 +109,6 @@ u32 spi_flash_read_id(u64 spi_base);
 
 int spi_flash_write_by_page(u64 spi_base, u32 fa, u8 *data, u32 size);
 void spi_flash_read_by_page(u64 spi_base, u32 fa, u8 *data, u32 size);
-
 
 int spi_flash_program(u64 spi_base, u32 sector_addr, u32 len);
 int do_page_prog(u64 spi_base, u8 *src_buf, u32 addr, u32 size);

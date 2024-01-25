@@ -93,7 +93,7 @@ static int response_test(int argc, char **argv)
 	mmio_write_32(REG_WDT+WDT_CR, (rpl<<2) | (response_mode)<<1 | 0 );
 	//mmio_write_32(REG_WDT+WDT_CR, (rpl<<2)  );
 #ifdef	PLATFORM_PALLADIUM
-	mmio_write_32(REG_WDT+WDT_TORR, 0x4);
+	mmio_write_32(REG_WDT+WDT_TORR, 0x4 | (0x4 << 4));
 #else
 	// Timeout Range Register
 	//2^(16 + i)
@@ -130,15 +130,32 @@ static int response_test(int argc, char **argv)
 	mmio_write_32(REG_WDT+WDT_CRR,0x76);
 
 #ifdef	PLATFORM_PALLADIUM
-	while((timer_meter_get_us() -us1) < 10000)
+	while((timer_meter_get_us() -us1) < 1000)
 	// while(0)
 #else
-	while((timer_meter_get_us() -us1) < 5000)
+	while((timer_meter_get_us() -us1) < 1000)
 #endif
 	{
 		// mmio_write_32(REG_WDT+WDT_CRR,0x76);
 		uartlog("CCVR: %x\n", mmio_read_32(REG_WDT+WDT_CCVR));
 	}
+
+	// disable wdt
+	writel(SOFT_RESET_REG0, readl(SOFT_RESET_REG0)&~(1<<14));
+	writel(SOFT_RESET_REG0, readl(SOFT_RESET_REG0)|(1<<14));
+	uartlog("---disable wdt, CR: %x\n", mmio_read_32(REG_WDT+WDT_CR));
+
+#ifdef	PLATFORM_PALLADIUM
+	while((timer_meter_get_us() -us1) < 2000)
+	// while(0)
+#else
+	while((timer_meter_get_us() -us1) < 1000)
+#endif
+	{
+		// mmio_write_32(REG_WDT+WDT_CRR,0x76);
+		uartlog("CCVR: %x\n", mmio_read_32(REG_WDT+WDT_CCVR));
+	}
+
 	us2 = timer_meter_get_us();
 	uartlog("us2: %u\n", us2);
 

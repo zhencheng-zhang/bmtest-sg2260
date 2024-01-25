@@ -50,7 +50,7 @@ void init_clk(void)
 void system_init(void)
 {
 	// init_clk();
-	// uart_init(0, 153600);
+	uart_init(115200);
 	irq_init();
 
 	printf("system init done\n");
@@ -98,6 +98,7 @@ inline void inv_clean_dcache_all(void)
 {
     // asm volatile("csrs CSR_MCOR, %0"::"rk"(MCOR_DC_SEL | MCOR_INV_SEL | MCOR_CLR_SEL));
 }
+
 
 
 struct irq_chip {

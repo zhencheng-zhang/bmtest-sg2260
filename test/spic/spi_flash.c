@@ -4,9 +4,11 @@
 #include "reg_spi.h"
 #include "spi_flash.h"
 #include "timer.h"
+#include "bm_spi_nand.h"
 
 void writel_fence(u64 addr, u32 val)
 {
+  __asm__ volatile("fence iorw, iorw":::);
   writel(addr, val);
   __asm__ volatile("fence iorw, iorw":::);
 }
@@ -23,17 +25,17 @@ void writew_fence(u64 addr, u16 val)
   __asm__ volatile("fence iorw, iorw":::);
 }
 
-static int spi_irq_handler(int irqn, void *priv)
-{
-  u64 spi_base = (u64)priv;
+// static int spi_irq_handler(int irqn, void *priv)
+// {
+//   u64 spi_base = (u64)priv;
 
-  // uartlog("In spi_irq_handler, INT_STS:%x, INT_NUM: %d \n", readl(spi_base + REG_BM1680_SPI_INT_STS), SPI_INTR);
-  /* avoid always in trap interrupt handler */
-  writel_fence(spi_base + REG_BM1680_SPI_INT_STS, readl(spi_base + REG_BM1680_SPI_INT_STS) & (~BM1680_SPI_INT_TRAN_DONE));
+//   uartlog("In spi_irq_handler, INT_STS:%x\n", readl(spi_base + REG_BM1680_SPI_INT_STS));
+//   /* avoid always in trap interrupt handler */
+//   writel_fence(spi_base + REG_BM1680_SPI_INT_STS, readl(spi_base + REG_BM1680_SPI_INT_STS) & (~BM1680_SPI_INT_TRAN_DONE));
 
-  uartlog("%s  irqn=%d \n",__func__, irqn);
-	return 0;
-}
+//   uartlog("%s  irqn=%d \n",__func__, irqn);
+// 	return 0;
+// }
 
 static inline u32 _check_reg_bits(volatile u32 *addr, u64 offset, u32 mask, u32 wait_loop)
 {
@@ -62,12 +64,12 @@ static inline u32 _check_reg_bits(volatile u32 *addr, u64 offset, u32 mask, u32 
 
 u8 spi_non_data_tran(u64 spi_base, u8* cmd_buf, u32 with_cmd, u32 addr_bytes)
 {
-  u32* p_data = (u32*)cmd_buf;
+  // u32* p_data = (u32*)cmd_buf;
 
-  if (addr_bytes > 3) {
-    uartlog("non-data: addr bytes should be less than 3 (%d)\n", addr_bytes);
-    return -1;
-  }
+  // if (addr_bytes > 3) {
+  //   uartlog("non-data: addr bytes should be less than 3 (%d)\n", addr_bytes);
+  //   return -1;
+  // }
 
   /* init tran_csr */
   u32 tran_csr = 0;
@@ -82,17 +84,23 @@ u8 spi_non_data_tran(u64 spi_base, u8* cmd_buf, u32 with_cmd, u32 addr_bytes)
 
   writel_fence(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //do flush FIFO before filling fifo
 
-  writel_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[0]);
+  // writel_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[0]);
+  u32 cmd_bytes = addr_bytes + ((with_cmd) ? 1 : 0);
+  for (int i = 0; i < cmd_bytes; i++) {
+      writeb_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, cmd_buf[i]);
+  }
 
   /* issue tran */
   writel_fence(spi_base + REG_BM1680_SPI_INT_STS, 0);   //clear all int
   tran_csr |= BM1680_SPI_TRAN_CSR_GO_BUSY;
+  writel_fence(spi_base + REG_BM1680_SPI_OPT, 3);
   writel_fence(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
 
   /* wait tran done */
   u32 int_stat = _check_reg_bits((volatile u32*)spi_base, REG_BM1680_SPI_INT_STS,
                       BM1680_SPI_INT_TRAN_DONE, 100000);
 
+  // writel_fence(spi_base + REG_BM1680_SPI_OPT, 0);
   if (int_stat == 0) {
     uartlog("non data timeout, int stat: 0x%08x\n", int_stat);
     return -1;
@@ -123,11 +131,18 @@ u8 spi_data_out_tran(u64 spi_base, u8* src_buf, u8* cmd_buf, u32 with_cmd, u32 a
   tran_csr |= (with_cmd) ? BM1680_SPI_TRAN_CSR_WITH_CMD : 0;
   tran_csr |= BM1680_SPI_TRAN_CSR_FIFO_TRG_LVL_8_BYTE;
   tran_csr |= BM1680_SPI_TRAN_CSR_TRAN_MODE_TX;
+  if (addr_bytes == 4) {
+    tran_csr |= 3<<20;
+  }
 
+  writel_fence(spi_base + REG_BM1680_SPI_OPT, 3);
   writel_fence(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //do flush FIFO before filling fifo
   if (with_cmd) {
-    for (int i = 0; i < ((cmd_bytes - 1) / 4 + 1); i++) {
-      writel_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[i]);
+    // for (int i = 0; i < ((cmd_bytes - 1) / 4 + 1); i++) {
+    //   writel_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[i]);
+    // }
+    for (int i = 0; i < cmd_bytes; i++) {
+      writeb_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, cmd_buf[i]);
     }
   }
 
@@ -138,6 +153,7 @@ u8 spi_data_out_tran(u64 spi_base, u8* src_buf, u8* cmd_buf, u32 with_cmd, u32 a
   writel_fence(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
   while ((readl(spi_base + REG_BM1680_SPI_FIFO_PT) & 0xf) != 0) {};   //wait for cmd issued
 
+  writel_fence(spi_base + REG_BM1680_SPI_FIFO_PT, 0);
   /* fill data */
   p_data = (u32*)src_buf;
   u32 off = 0;
@@ -202,6 +218,9 @@ u8 spi_data_in_tran(u64 spi_base, u8* dst_buf, u8* cmd_buf, u32 with_cmd, u32 ad
     for (int i = 0; i < ((cmd_bytes - 1) / 4 + 1); i++) {
       writel_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[i]);
     }
+    // for (int i = 0; i < cmd_bytes; i++) {
+    //   writeb_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, cmd_buf[i]);
+    // }
   }
 
   // writel_fence(spi_base + REG_BM1680_SPI_INT_EN, BM1680_SPI_INT_RD_FIFO_EN);
@@ -240,6 +259,7 @@ u8 spi_data_in_tran(u64 spi_base, u8* dst_buf, u8* cmd_buf, u32 with_cmd, u32 ad
       }
     }
     for (int i = 0; i < ((xfer_size - 1) / 4 + 1); i++) {
+      __asm__ volatile("fence iorw, iorw":::);
       p_data[off / 4 + i] = readl(spi_base + REG_BM1680_SPI_FIFO_PORT);
     }
     off += xfer_size;
@@ -290,18 +310,15 @@ u8 spi_in_out_tran(u64 spi_base, u8* dst_buf, u8* src_buf,  u32 with_cmd, u32 ad
   tran_csr |= BM1680_SPI_TRAN_CSR_TRAN_MODE_TX;
   tran_csr |= BM1680_SPI_TRAN_CSR_TRAN_MODE_RX;
 
+  writel_fence(spi_base + REG_BM1680_SPI_OPT, 3);
   writel_fence(spi_base + REG_BM1680_SPI_FIFO_PT, 0);    //do flush FIFO before filling fifo
   u32 total_out_bytes = addr_bytes + send_bytes +((with_cmd) ? 1 : 0);
-  // in spi_flash_read_id: total_out_bytes=4
   for (int i = 0; i < ((total_out_bytes - 1) / 4 + 1); i++) {
     writel_fence(spi_base + REG_BM1680_SPI_FIFO_PORT, p_data[i]);
   }
 
-  // uartlog("----%s\n", __func__);
-
   /* issue tran */
   writel_fence(spi_base + REG_BM1680_SPI_INT_STS, 0);   //clear all int
-
   writel_fence(spi_base + REG_BM1680_SPI_TRAN_NUM, get_bytes);
   tran_csr |= BM1680_SPI_TRAN_CSR_GO_BUSY;
   writel_fence(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
@@ -309,8 +326,9 @@ u8 spi_in_out_tran(u64 spi_base, u8* dst_buf, u8* src_buf,  u32 with_cmd, u32 ad
   // trans cmd first
   /* wait tran done and get data */
   u32 int_stat = _check_reg_bits((volatile u32*)spi_base, REG_BM1680_SPI_INT_STS,
-                      BM1680_SPI_INT_TRAN_DONE, 100000);
+                      BM1680_SPI_INT_TRAN_DONE, 1000000);
 
+  // writel_fence(spi_base + REG_BM1680_SPI_OPT, 0);
   if (int_stat == 0) {
     uartlog("data in timeout\n");
     return -1;
@@ -318,7 +336,9 @@ u8 spi_in_out_tran(u64 spi_base, u8* dst_buf, u8* src_buf,  u32 with_cmd, u32 ad
 
   p_data = (u32*)dst_buf;
   for (int i = 0; i < ((get_bytes - 1) / 4 + 1); i++) {
+    __asm__ volatile("fence iorw, iorw":::);
     p_data[i] = readl(spi_base + REG_BM1680_SPI_FIFO_PORT);
+    __asm__ volatile("fence iorw, iorw":::);
   }
   writel_fence(spi_base + REG_BM1680_SPI_FIFO_PT, 0);  //should flush FIFO after tran
 
@@ -400,42 +420,78 @@ u8 spi_reg_status(u64 spi_base, u8 cmd)
 
 u8 spi_data_read(u64 spi_base, u8* dst_buf, u32 addr, u32 size)
 {
-  u8 cmd_buf[4];
-
-  cmd_buf[0] = SPI_CMD_READ;
-  cmd_buf[1] = ((addr) >> 16) & 0xFF;
-  cmd_buf[2] = ((addr) >> 8) & 0xFF;
-  cmd_buf[3] = (addr) & 0xFF;
-  spi_data_in_tran(spi_base, dst_buf, cmd_buf, 1, 3, size);
+  u8 cmd_buf[5];
+  u8 addr_byte;
+  memset(cmd_buf, 0, sizeof(cmd_buf));
+  
+  if (addr >> 24) {
+    // 4 Byte read
+    cmd_buf[0] = SPI_CMD_READ_4B;
+    cmd_buf[1] = ((addr) >> 24) & 0xFF;
+    cmd_buf[2] = ((addr) >> 16) & 0xFF;
+    cmd_buf[3] = ((addr) >> 8) & 0xFF;
+    cmd_buf[4] = (addr) & 0xFF;
+    addr_byte = 4;
+  } else {
+    cmd_buf[0] = SPI_CMD_READ;
+    cmd_buf[1] = ((addr) >> 16) & 0xFF;
+    cmd_buf[2] = ((addr) >> 8) & 0xFF;
+    cmd_buf[3] = (addr) & 0xFF;
+    addr_byte = 3;
+  }
+  spi_data_in_tran(spi_base, dst_buf, cmd_buf, 1, addr_byte, size);
 
   return 0;
 }
 
 u8 spi_flash_page_program(u64 spi_base, u8 *src_buf, u32 addr, u32 size)
 {
-  u8 cmd_buf[4];
+  u8 cmd_buf[5];
+  u8 addr_byte;
   memset(cmd_buf, 0, sizeof(cmd_buf));
 
-  cmd_buf[0] = SPI_CMD_PP;
-  cmd_buf[1] = (addr >> 16) & 0xFF;
-  cmd_buf[2] = (addr >> 8) & 0xFF;
-  cmd_buf[3] = addr & 0xFF;
+  if (addr >> 24) {
+    // 4 Byte write
+    cmd_buf[0] = SPI_CMD_PP_4B;
+    cmd_buf[1] = ((addr) >> 24) & 0xFF;
+    cmd_buf[2] = ((addr) >> 16) & 0xFF;
+    cmd_buf[3] = ((addr) >> 8) & 0xFF;
+    cmd_buf[4] = (addr) & 0xFF;
+    addr_byte = 4;
+  } else {
+    cmd_buf[0] = SPI_CMD_PP;
+    cmd_buf[1] = ((addr) >> 16) & 0xFF;
+    cmd_buf[2] = ((addr) >> 8) & 0xFF;
+    cmd_buf[3] = (addr) & 0xFF;
+    addr_byte = 3;
+  }
 
-  spi_data_out_tran(spi_base, src_buf, cmd_buf, 1, 3, size);
+  spi_data_out_tran(spi_base, src_buf, cmd_buf, 1, addr_byte, size);
 
   return 0;
 }
 
 void spi_flash_sector_erase(u64 spi_base, u32 addr)
 {
-  u8 cmd_buf[4];
+  u8 cmd_buf[5];
+  u8 addr_byte;
   memset(cmd_buf, 0, sizeof(cmd_buf));
 
-  cmd_buf[0] = SPI_CMD_SE;
-  cmd_buf[1] = (addr >> 16) & 0xFF;
-  cmd_buf[2] = (addr >> 8) & 0xFF;
-  cmd_buf[3] = addr & 0xFF;
-  spi_non_data_tran(spi_base, cmd_buf, 1, 3);
+  cmd_buf[0] = SPI_CMD_BE;
+  
+  if (addr >> 24) {
+    cmd_buf[1] = ((addr) >> 24) & 0xFF;
+    cmd_buf[2] = ((addr) >> 16) & 0xFF;
+    cmd_buf[3] = ((addr) >> 8) & 0xFF;
+    cmd_buf[4] = (addr) & 0xFF;
+    addr_byte = 4;
+  } else {
+    cmd_buf[1] = ((addr) >> 16) & 0xFF;
+    cmd_buf[2] = ((addr) >> 8) & 0xFF;
+    cmd_buf[3] = (addr) & 0xFF;
+    addr_byte = 3;
+  }
+  spi_non_data_tran(spi_base, cmd_buf, 1, addr_byte);
 
   return;
 }
@@ -445,7 +501,7 @@ void spi_flash_bulk_erase(u64 spi_base)
   u8 cmd_buf[4];
   memset(cmd_buf, 0, sizeof(cmd_buf));
 
-  cmd_buf[0] = SPI_CMD_BE;
+  cmd_buf[0] = SPI_CMD_CE;
   spi_non_data_tran(spi_base, cmd_buf, 1, 0);
 
   return;
@@ -569,8 +625,8 @@ int spi_flash_write_by_page(u64 spi_base, u32 fa, u8 *data, u32 size)
     int ret = memcmp(data, cmp_buf, SPI_PAGE_SIZE);
     if (ret != 0) {
       uartlog("page program test memcmp failed: 0x%08x\n", ret);
-      //dump_hex((char *)"src_buf", (void *)data, SPI_PAGE_SIZE);
-      //dump_hex((char *)"cmp_buf", (void *)cmp_buf, SPI_PAGE_SIZE);
+      dump_hex((char *)"src_buf", (void *)data, SPI_PAGE_SIZE);
+      dump_hex((char *)"cmp_buf", (void *)cmp_buf, SPI_PAGE_SIZE);
       return ret;
     }else{
 	    uartlog("page program test memcmp success: 0x%08x\n", ret);
@@ -608,7 +664,7 @@ void spi_flash_soft_reset(u64 spi_base)
   //SCK frequency = HCLK frequency / (2(SckDiv+ 1))
   //0x8C003 is default value, 0x200000 is softrst
   // {CPOL, CPHA} -> 4 modes
-  writel_fence(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) | 0x1<<21 | 0x3 | 0x3<<12);
+  writel_fence(spi_base + REG_BM1680_SPI_CTRL, readl(spi_base + REG_BM1680_SPI_CTRL) | 0x1<<21 | 16 | 0x3<<12);
   uartlog("mode: %d\n", (readl(spi_base + REG_BM1680_SPI_CTRL) >> 12) & 0b11);
   //uartlog("%s:%d\n", __func__, __LINE__);
   return;
@@ -630,12 +686,41 @@ u64 spi_flash_map_enable(u8 enable)
   return spi_base;
 }
 
+uint32_t spi_nor_enter_4byte(unsigned long spi_base, uint32_t enter)
+{
+	uint8_t cmd_buf[5];
+	uint8_t data_buf[20];
+	uint32_t read_id = 0;
+
+	printf("%s\n", __func__);
+
+	memset(cmd_buf, 0, sizeof(cmd_buf));
+	memset(data_buf, 0, sizeof(data_buf));
+
+	if (enter) {
+		cmd_buf[0] = SPI_CMD_EN4B;
+	} else {
+		cmd_buf[0] = SPI_CMD_EX4B;
+	}
+
+	spi_in_out_tran(spi_base, data_buf, cmd_buf, 1, 0, 3, 3);
+
+	for (uint32_t i = 0; i < 20; i++) {
+		printf("%d: 0x%x\n", i, data_buf[i]);
+	}
+
+	read_id = (data_buf[2] << 16) | (data_buf[1] << 8) | (data_buf[0]);
+
+	return read_id;
+}
+
 void spi_flash_init(u64 spi_base)
 {
   u32 tran_csr = 0;
 
   spi_flash_set_dmmr_mode(spi_base, 0);
   spi_flash_soft_reset(spi_base);
+  spi_nor_enter_4byte(spi_base, 1);
 
   //uartlog("%s:%d\n", __func__, __LINE__);
 
@@ -646,7 +731,7 @@ void spi_flash_init(u64 spi_base)
   writel_fence(spi_base + REG_BM1680_SPI_TRAN_CSR, tran_csr);
   //uartlog("%s:%d\n", __func__, __LINE__);
   writel_fence(spi_base + REG_BM1680_SPI_INT_EN, BM1680_SPI_INT_TRAN_DONE_EN);
-  request_irq(SPI_INTR, spi_irq_handler, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_MASK, "spi int", (void *)spi_base);
+  // request_irq(SPI_INTR, spi_irq_handler, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_MASK, "spi int", (void *)spi_base);
 #ifdef DEBUG
   printf("check spi reg con[0x%08x]: 0x%08x\n", spi_base + REG_BM1680_SPI_CTRL,
            readl(spi_base + REG_BM1680_SPI_CTRL));

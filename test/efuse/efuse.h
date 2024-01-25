@@ -13,27 +13,27 @@ u32 efuse_num_cells();
 #define SOFT_RESET_EFUSE1_BIT   11
 #endif
 
-#define CLK_EN_EFUSE_BIT    16
-#define CLK_EN_APB_EFUSE_BIT    17
+#define CLK_EN_EFUSE_BIT    17
+#define CLK_EN_APB_EFUSE_BIT    18
 #define EFUSE_PD_BIT		8
 
-#define SCS					10
-#define SEC_REGION			11
-#define SEC_REGION_EXTRA	12
-#define W_LOCK				56
-#define W_LOCK_NUM			8
-#define KPUB_HASH			32
+#define SCS					1
+#define SEC_REGION			2
+#define SEC_REGION_EXTRA	3
+#define W_LOCK				20
+#define W_LOCK_NUM			4
+#define KPUB_HASH			12
 #define KPUB_HASH_NUM		8
 
 #define SOFT_RESET_EFUSE_BIT	SOFT_RESET_EFUSE0_BIT
 #define EFUSE_BASE				EFUSE0_BASE
 #define SHADOW_REG_BASE			0x7040000800UL
-#define ROM_BASE				0x7000000000UL
-#define ROM_PATCH_N				58
-#define ROM_PATCH_OFFSET		64
+#define ROM_BASE				0x7000020000UL
+#define ROM_PATCH_N				50
+#define ROM_PATCH_OFFSET		24
 
 #define BOOT_DONE_BIT		7
-#define EFUSE_MAX			179	// 256*32
+#define EFUSE_MAX			127	// 256*32
 
 /*
  * address: [0, efuse_num_cells() - 1]

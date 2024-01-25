@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2018 bitmain
  */
-#define DMAC_BASE 0x29340000
+#define DMAC_BASE 0x7020000000
 #define DMA_CHAN_BASE DMAC_BASE
 #define DMA_INT_BASE 0x5801900C
 
@@ -135,23 +135,6 @@
 
 typedef	uintptr_t	size_t;
 
-#define DMAC_WRITE(offset, value) \
-	writeq(DMAC_BASE + offset , (uint64_t)value)
-
-#define DMAC_READ(offset) \
-	readq(DMAC_BASE + offset)
-
-#define DMA_CHAN_WRITE(chan, offset, value) \
-	writeq((uint64_t)(DMA_CHAN_BASE + ((chan * 0x100) +offset)), (uint64_t)(value));
-
-#define DMA_CHAN_READ(chan, offset) \
-	readq((uint64_t)(DMA_CHAN_BASE + ((chan * 0x100) + offset)));
-
-#define LLI_WRITE(addr, offset, value) \
-	*(addr + (offset / 8)) = (uint64_t)(value)
-
-#define LLI_READ(addr, offset) \
-	readq(addr + offset)
 
 #define min_t(type, x, y) ({				\
 		type __min1 = (x);                      \
